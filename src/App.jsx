@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import Cabecalho from './componentes/Cabecalho.jsx'
 import Inicio from './paginas/Inicio.jsx'
 import Visualizacao from './paginas/Visualizacao.jsx'
+import Home from './paginas/Home.jsx'
 import { processarDados, DEMO_SHEETS } from './utils/processamento.js'
 import { fetchAllSheets } from './utils/gvizUtils.js'
 
@@ -12,7 +13,8 @@ const SHEETS_INICIAL = {
   bordomaquina: [],
   comerciais: [],
   prpo: [],
-  sourcingPlans: []
+  sourcingPlans: [],
+  pcpManufacturing: []
 }
 
 const FILTERS_INICIAIS = {
@@ -23,7 +25,7 @@ const FILTERS_INICIAIS = {
 }
 
 export default function App() {
-  const [tela, setTela] = useState('upload')
+  const [tela, setTela] = useState('home')
   const [fileQueue, setFileQueue] = useState([])
   const [feedback, setFeedback] = useState('')
   const [processedData, setProcessedData] = useState([])
@@ -52,11 +54,22 @@ export default function App() {
         const workbook = await readExcel(file)
         const fileName = file.name.toLowerCase()
         const fileIsSourcingPlan = fileName.includes('sourcing') && fileName.includes('plan')
+        const fileIsPcpManufacturing = fileName.includes('pcp') || fileName.includes('manufacturing') || fileName.includes('manufatura')
         const hasNamedSourcingTab = workbook.SheetNames.some(name => {
           const normalized = name.toLowerCase().replace(/[_-]+/g, ' ')
           return normalized.includes('sourcing plan') || normalized.includes('sourcingplan')
         })
         const fallbackSourcingTab = fileIsSourcingPlan && !hasNamedSourcingTab
+          ? workbook.SheetNames.find(name => {
+              const normalized = name.toLowerCase()
+              return !normalized.includes('bkp') && !normalized.includes('backup') && !normalized.includes('copia') && !normalized.includes('cópia')
+            })
+          : null
+        const hasNamedPcpTab = workbook.SheetNames.some(name => {
+          const normalized = name.toLowerCase().replace(/[_-]+/g, ' ')
+          return normalized.includes('pcp') || normalized.includes('manufacturing') || normalized.includes('manufatura')
+        })
+        const fallbackPcpTab = fileIsPcpManufacturing && !hasNamedPcpTab
           ? workbook.SheetNames.find(name => {
               const normalized = name.toLowerCase()
               return !normalized.includes('bkp') && !normalized.includes('backup') && !normalized.includes('copia') && !normalized.includes('cópia')
@@ -76,6 +89,8 @@ export default function App() {
             sheets.followUp = sheets.followUp.length === 0 ? data : [...sheets.followUp, ...data]
           } else if (lower.includes('saturação') || lower.includes('saturacao')) {
             sheets.saturacao = sheets.saturacao.length === 0 ? data : [...sheets.saturacao, ...data]
+          } else if (lower.includes('pcp') || lower.includes('manufacturing') || lower.includes('manufatura') || (fileIsPcpManufacturing && lower.includes('bordo')) || sheetName === fallbackPcpTab) {
+            sheets.pcpManufacturing = sheets.pcpManufacturing.length === 0 ? data : [...sheets.pcpManufacturing, ...data]
           } else if (lower.includes('bordomaquina') || lower.includes('bordo')) {
             sheets.bordomaquina = sheets.bordomaquina.length === 0 ? data : [...sheets.bordomaquina, ...data]
           } else if (lower.includes('comerciai') || lower.includes('poprog')) {
@@ -144,17 +159,38 @@ export default function App() {
 
   return (
     <>
-      <Cabecalho />
+      <Cabecalho onHome={() => setTela('home')} showHome={tela !== 'home'} />
       <main className="main-content">
-        {tela === 'upload' && (
-          <Inicio
-            fileQueue={fileQueue}
-            onAddFiles={handleAddFiles}
-            onProcess={handleProcessar}
-            onDemo={handleDemo}
-            feedback={feedback}
-            onProcessSheets={handleProcessSheets}
+        {tela === 'home' && (
+          <Home
+            hasData={processedData.length > 0}
+            onOpenSupplyChain={() => setTela('dashboard')}
+            onOpenDatabase={() => setTela('database')}
           />
+        )}
+
+        {tela === 'database' && (
+          <section className="database-page" aria-labelledby="database-title">
+            <div className="database-page-heading">
+              <div>
+                <span className="home-eyebrow">ÁREA ADMINISTRATIVA</span>
+                <h2 id="database-title">Banco de dados</h2>
+                <p>Carregue as planilhas que serão processadas pelo Supply Chain Tracker.</p>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={() => setTela('home')}>Voltar ao início</button>
+            </div>
+            <div className="database-storage-warning">
+              <strong>Limitação desta versão:</strong> o projeto ainda não possui backend conectado ao PostgreSQL. Os dados importados ficam na memória do navegador e não são compartilhados automaticamente com outros usuários.
+            </div>
+            <Inicio
+              fileQueue={fileQueue}
+              onAddFiles={handleAddFiles}
+              onProcess={handleProcessar}
+              onDemo={handleDemo}
+              feedback={feedback}
+              onProcessSheets={handleProcessSheets}
+            />
+          </section>
         )}
 
         {tela === 'dashboard' && (
@@ -168,6 +204,7 @@ export default function App() {
             selectedCard={selectedCard}
             onSelectCard={setSelectedCard}
             onCloseModal={() => setSelectedCard(null)}
+            onOpenDatabase={() => setTela('database')}
           />
         )}
       </main>

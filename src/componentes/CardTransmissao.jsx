@@ -9,6 +9,11 @@ const STAGES_MAP = [
 ]
 
 export default function CardTransmissao({ card, onSelect, index = 0 }) {
+  const suppliers = Array.from(new Set([
+    ...(card.materiais?.construtivos ?? []).flatMap(item => item.fornecedores?.length ? item.fornecedores : [item.fornecedor || item.fabricante]),
+    card.construtivo?.fornecedor
+  ].map(value => String(value ?? '').trim()).filter(value => value && value !== '-' && value.toLowerCase() !== 'não informado' && value.toLowerCase() !== 'construtivo')))
+
   const handleKeyDown = event => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -32,12 +37,12 @@ export default function CardTransmissao({ card, onSelect, index = 0 }) {
           <span className="card-tag">Linha: {card.linha || '—'}</span>
           <span className="card-tag">Operação: {card.operacao || '—'}</span>
           <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
+          {suppliers.length > 0 && <span className="card-tag card-tag-supplier">Fornecedor: {suppliers.join(', ')}</span>}
         </div>
         <span className="transmission-id">ID: {card.id}</span>
       </div>
 
       <p className="card-desc"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
-
 
       <div className="card-stages" aria-label="Status das classes">
         {STAGES_MAP.map(({ key, label, icon: StageIcon }) => {

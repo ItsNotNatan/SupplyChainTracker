@@ -32,7 +32,7 @@ export default function BotaoUpload({
   const isProcessing = Boolean(feedback)
 
   return (
-    <div className="overlay">
+    <div className="overlay database-upload-overlay">
       <div
         className="drop-zone"
         ref={dropZoneRef}

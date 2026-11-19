@@ -5,6 +5,13 @@ import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
 
 const PAGE_SIZE = 48
 
+function getTransmissionStatus(card) {
+  const statuses = Object.values(card.stages ?? {}).filter(status => status && status !== 'Vazio')
+  if (statuses.length === 0) return 'Vazio'
+  if (statuses.includes('On delayed')) return 'On delayed'
+  return statuses.every(status => status === 'Complete') ? 'Complete' : 'Ongoing'
+}
+
 function normalizeSearch(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -42,7 +49,8 @@ export default function Visualizacao({
   uniqueOperacoes,
   selectedCard,
   onSelectCard,
-  onCloseModal
+  onCloseModal,
+  onOpenDatabase
 }) {
   const [page, setPage] = useState(1)
 
@@ -60,6 +68,16 @@ export default function Visualizacao({
   useEffect(() => { setPage(1) }, [filtered])
 
   const visible = useMemo(() => filtered.slice(0, page * PAGE_SIZE), [filtered, page])
+  const summary = useMemo(() => {
+    const counts = { total: filtered.length, ongoing: 0, delayed: 0, complete: 0 }
+    filtered.forEach(card => {
+      const status = getTransmissionStatus(card)
+      if (status === 'Ongoing') counts.ongoing += 1
+      if (status === 'On delayed') counts.delayed += 1
+      if (status === 'Complete') counts.complete += 1
+    })
+    return counts
+  }, [filtered])
   const hasMore = filtered.length > visible.length
   const remaining = filtered.length - visible.length
 
@@ -116,6 +134,13 @@ export default function Visualizacao({
           </select>
         </div>
 
+        <div className="stats-grid" aria-label="Resumo das transmissões filtradas">
+          <div className="stat-card blue"><div className="stat-title">Total de transmissões</div><div className="stat-value">{summary.total}</div></div>
+          <div className="stat-card yellow"><div className="stat-title">Em andamento</div><div className="stat-value">{summary.ongoing}</div></div>
+          <div className="stat-card red"><div className="stat-title">Atrasadas ou em risco</div><div className="stat-value">{summary.delayed}</div></div>
+          <div className="stat-card green"><div className="stat-title">Concluídas</div><div className="stat-value">{summary.complete}</div></div>
+        </div>
+
         <div className="cards-result-count">
           {filtered.length} {filtered.length === 1 ? 'transmissão encontrada' : 'transmissões encontradas'}
         </div>
@@ -124,8 +149,18 @@ export default function Visualizacao({
           {filtered.length === 0 ? (
             <div className="empty-state">
               <SearchX className="icon-xl" />
-              <p style={{ fontWeight: 600 }}>Nenhuma transmissão encontrada.</p>
-              <p style={{ fontSize: '.8rem' }}>Altere ou limpe um dos filtros para ver outros resultados.</p>
+              {processedData.length === 0 ? (
+                <>
+                  <p style={{ fontWeight: 600 }}>Nenhum dado carregado.</p>
+                  <p style={{ fontSize: '.8rem' }}>Acesse o Banco de dados para importar as planilhas do projeto.</p>
+                  <button type="button" className="btn btn-primary" onClick={onOpenDatabase}>Abrir banco de dados</button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontWeight: 600 }}>Nenhuma transmissão encontrada.</p>
+                  <p style={{ fontSize: '.8rem' }}>Altere ou limpe um dos filtros para ver outros resultados.</p>
+                </>
+              )}
             </div>
           ) : (
             <>

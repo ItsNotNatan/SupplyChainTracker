@@ -20,6 +20,7 @@ const COMPLEMENTARY_MILESTONES = [
 
 export default function ModalDetalhes({ card, onClose }) {
   const [activeTab, setActiveTab] = useState('All')
+  const [activeEngineeringSub, setActiveEngineeringSub] = useState('All')
 
   useEffect(() => {
     const handleKeyDown = event => {
@@ -29,7 +30,15 @@ export default function ModalDetalhes({ card, onClose }) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  useEffect(() => setActiveTab('All'), [card?.id])
+  useEffect(() => {
+    setActiveTab('All')
+    setActiveEngineeringSub('All')
+  }, [card?.id])
+
+  function handleTabChange(tab) {
+    setActiveTab(tab)
+    setActiveEngineeringSub('All')
+  }
 
   if (!card) return null
 
@@ -60,23 +69,37 @@ export default function ModalDetalhes({ card, onClose }) {
         </div>
 
         <div className="modal-body">
-          <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={setActiveTab} />
+          <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={handleTabChange} />
 
           <div className="details-grid">
             {showEngineering && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={PenTool} title="Engenharia" status={card.stages?.Engenharia} />
                 <div className="engineering-subgrid">
-                  <EngineeringSubsection title="Mec" status={card.subStages?.EngMecanica}>
+                  <EngineeringSubsection
+                    id="mecanica"
+                    title="Mec"
+                    status={card.subStages?.EngMecanica}
+                    expanded={activeEngineeringSub === 'All' || activeEngineeringSub === 'Mec'}
+                    selected={activeEngineeringSub === 'Mec'}
+                    onClick={() => setActiveEngineeringSub(current => current === 'Mec' ? 'All' : 'Mec')}
+                  >
                     <InfoRow label="Desenho 3D" value={card.construtivo?.des3D || 'Não mapeado'} badge />
                     <InfoRow label="Desenho 2D" value={card.construtivo?.des2D || 'Não mapeado'} badge />
                     <InfoRow label="Lista de materiais mecânicos" value={card.pcp?.listaMatMec && card.pcp.listaMatMec !== 'Não mapeado' ? card.pcp.listaMatMec : (card.construtivo?.listaMatMec || 'Não mapeado')} badge />
                     <InfoRow label="Revisão" value={card.construtivo?.rev || '—'} />
                   </EngineeringSubsection>
 
-                  <EngineeringSubsection title="Controls" status={card.subStages?.EngControls}>
+                  <EngineeringSubsection
+                    id="controls"
+                    title="Controles"
+                    status={card.subStages?.EngControls}
+                    expanded={activeEngineeringSub === 'All' || activeEngineeringSub === 'Controls'}
+                    selected={activeEngineeringSub === 'Controls'}
+                    onClick={() => setActiveEngineeringSub(current => current === 'Controls' ? 'All' : 'Controls')}
+                  >
                     <InfoRow label="Projeto elétrico" value={card.pcp?.projEle || 'Não mapeado'} badge />
-                    <InfoRow label="Lista de materiais de controls" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
+                    <InfoRow label="Lista de materiais de controles" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
                     <InfoRow label="Topográfico" value={card.pcp?.projTop || 'Não mapeado'} badge />
                     <InfoRow label="Lista de identificações" value={card.pcp?.listaIdent || 'Não mapeado'} badge />
                     <InfoRow label="Layout de calha" value={card.pcp?.layoutCalha || 'Não mapeado'} badge />
@@ -138,12 +161,16 @@ export default function ModalDetalhes({ card, onClose }) {
                   <InfoRow label="Estratégia" value={card.manufatura?.estrategia || 'Não mapeado'} />
                   <InfoRow label="Montagem mecânica" value={card.manufatura?.montagemMecanica || 'Não mapeado'} />
                   <InfoRow label="Medição 3D" value={card.manufatura?.medicao3D || 'Não mapeado'} />
-                  <InfoRow label="Bordo-máquina" value={card.manufatura?.bordoMaquina || (card.pcp ? 'Registrado no PCP' : 'Não mapeado')} />
+                  <InfoRow label="Bordo-máquina" value={card.manufatura?.bordoMaquina || 'Não mapeado'} />
                   <InfoRow label="Inspeção da qualidade" value={card.manufatura?.inspecaoQualidade || card.pcp?.testes || 'Não mapeado'} />
+                  <InfoRow label="Controle de processo" value={card.pcp?.controleProcesso || 'Não mapeado'} />
                   {card.construtivo?.localEnt && card.construtivo.localEnt !== '-' && (
                     <InfoRow label="Local de montagem" value={card.construtivo.localEnt} />
                   )}
                 </div>
+                {card.pcp?.semanaEntrega && (
+                  <p className="date-table-note manufacturing-week-note">Semana informada no PCP: <strong>{card.pcp.semanaEntrega}</strong>. A conversão para uma data depende do calendário/ano da planilha de origem.</p>
+                )}
                 <DateTable
                   title="Entrega do dispositivo"
                   dates={{ entregaDispositivo: card.manufatura?.entregaDispositivo || card.pcp?.entregaDispositivo }}
@@ -201,24 +228,35 @@ function SectionTitle({ icon: Icon, title, status }) {
   )
 }
 
-function EngineeringSubsection({ title, status, children }) {
+function EngineeringSubsection({ id, title, status, expanded, selected, onClick, children }) {
   const theme = getTheme(status)
   const StatusIcon = theme.Icon
   return (
-    <div className="engineering-subsection">
-      <div className="engineering-subsection-title">
+    <section className={`engineering-subsection ${selected ? 'selected' : ''}`}>
+      <button
+        type="button"
+        className="engineering-subsection-toggle"
+        onClick={onClick}
+        aria-expanded={expanded}
+        aria-controls={`engineering-subsection-${id}`}
+        aria-pressed={selected}
+      >
         <span>{title}</span>
-        <StatusIcon className={`icon-sm ${theme.c}`} title={`Status: ${theme.t}`} />
-      </div>
-      {children}
-    </div>
+        <span className="engineering-subsection-toggle-status" title={`Status: ${theme.t}`} aria-label={`Status: ${theme.t}`}>
+          <StatusIcon className={`icon-sm ${theme.c}`} />
+        </span>
+      </button>
+      {expanded && <div id={`engineering-subsection-${id}`} className="engineering-subsection-content">{children}</div>}
+    </section>
   )
 }
 
 function MaterialCard({ item, category }) {
   const isCommercial = category === 'commercial'
   const manufacturerLabel = isCommercial ? 'Fabricante' : 'Fornecedor'
-  const manufacturerValue = isCommercial ? item.fabricante : (item.fornecedor || item.fabricante)
+  const manufacturerValue = isCommercial
+    ? item.fabricante
+    : (item.fornecedores?.length ? item.fornecedores.join(', ') : (item.fornecedor || item.fabricante))
 
   return (
     <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'}`}>
@@ -235,9 +273,32 @@ function MaterialCard({ item, category }) {
         <InfoRow label="Referência" value={item.referencia || '—'} />
         <InfoRow label={manufacturerLabel} value={manufacturerValue || 'Não informado'} />
         <InfoRow label="Status da liberação" value={item.statusLiberacao || 'Não informado'} badge />
-        <InfoRow label="Nº da RC" value={item.rc || 'Não informado'} />
-        <InfoRow label="Nº da PO" value={item.po || 'Não informado'} />
+        {(isCommercial || (item.fornecedoresDetalhes?.length ?? 0) <= 1) && (
+          <>
+            <InfoRow label="Nº da RC" value={item.rc || 'Não informado'} />
+            <InfoRow label="Nº da PO" value={item.po || 'Não informado'} />
+          </>
+        )}
       </div>
+
+      {!isCommercial && (item.fornecedoresDetalhes?.length ?? 0) > 1 && (
+        <div className="date-table-block compact">
+          <div className="date-table-heading">Acompanhamento por fornecedor</div>
+          <div className="date-table-scroll">
+            <table className="date-table">
+              <thead><tr><th>Fornecedor</th><th>Nº da RC</th><th>Nº da PO</th><th>Status da liberação</th></tr></thead>
+              <tbody>{item.fornecedoresDetalhes.map((supplier, index) => (
+                <tr key={`${supplier.nome}-${index}`}>
+                  <th scope="row">{supplier.nome}</th>
+                  <td>{supplier.rc || 'Não informado'}</td>
+                  <td>{supplier.po || 'Não informado'}</td>
+                  <td>{supplier.statusLiberacao || 'Não informado'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <DateTable title="Datas de acompanhamento" dates={item.datas} milestones={MATERIAL_MILESTONES} />
       <SingleDateTable title="Dados de outras planilhas" dates={item.datasComplementares} milestones={COMPLEMENTARY_MILESTONES} />
@@ -267,7 +328,7 @@ function DateTable({ title, dates = {}, milestones, compact = false }) {
           <thead>
             <tr>
               <th>Marco</th>
-              <th>Planeado</th>
+              <th>Planejado</th>
               <th>Previsto</th>
               <th>Realizado</th>
             </tr>
