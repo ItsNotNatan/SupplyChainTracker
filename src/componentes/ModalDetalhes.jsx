@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  X, Folder, Hash, PenTool, DollarSign, Wrench, Factory, ChevronDown, ChevronUp
+  X, Folder, Hash, PenTool, DollarSign, Wrench, Factory, ChevronDown, ChevronUp, Search
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
@@ -18,9 +18,40 @@ const COMPLEMENTARY_MILESTONES = [
   { key: 'entregaUsuario', label: 'Data de entrega ao usuário' }
 ]
 
-export default function ModalDetalhes({ card, onClose }) {
-  const [activeTab, setActiveTab] = useState('All')
+// 1. LIMITE DEFINIDO PARA 5 ITENS POR PÁGINA
+const ITENS_POR_PAGINA = 5
+
+function filtrarMateriais(materiais, termoBusca) {
+  if (!termoBusca) return materiais
+  
+  const keyword = String(termoBusca)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+
+  return materiais.filter(item => {
+    const textoItem = [
+      item.descricao, item.referencia, item.fabricante, 
+      item.fornecedor, item.rc, item.po, item.tag
+    ].filter(Boolean).join(' ')
+     .normalize('NFD')
+     .replace(/[\u0300-\u036f]/g, '')
+     .toLowerCase()
+
+    return textoItem.includes(keyword)
+  })
+}
+
+export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [activeEngineeringSub, setActiveEngineeringSub] = useState('All')
+  
+  const [buscaComerciais, setBuscaComerciais] = useState('')
+  const [buscaConstrutivos, setBuscaConstrutivos] = useState('')
+
+  const [paginaComerciais, setPaginaComerciais] = useState(1)
+  const [paginaConstrutivos, setPaginaConstrutivos] = useState(1)
 
   useEffect(() => {
     const handleKeyDown = event => {
@@ -31,9 +62,14 @@ export default function ModalDetalhes({ card, onClose }) {
   }, [onClose])
 
   useEffect(() => {
-    setActiveTab('All')
+    setActiveTab(initialTab)
     setActiveEngineeringSub('All')
-  }, [card?.id])
+    
+    setBuscaComerciais('')
+    setBuscaConstrutivos('')
+    setPaginaComerciais(1)
+    setPaginaConstrutivos(1)
+  }, [card?.id, initialTab])
 
   function handleTabChange(tab) {
     setActiveTab(tab)
@@ -47,7 +83,22 @@ export default function ModalDetalhes({ card, onClose }) {
   const showCommercial = showAll || activeTab === 'Comerciais'
   const showConstructive = showAll || activeTab === 'Construtivos'
   const showManufacturing = showAll || activeTab === 'Manufatura'
+  
   const materials = card.materiais ?? { comerciais: [], construtivos: [] }
+  
+  // 2. MATEMÁTICA DA PAGINAÇÃO PARA COMERCIAIS
+  const comerciaisFiltrados = filtrarMateriais(materials.comerciais, buscaComerciais)
+  const totalPaginasComerciais = Math.ceil(comerciaisFiltrados.length / ITENS_POR_PAGINA)
+  const indiceInicioComerciais = (paginaComerciais - 1) * ITENS_POR_PAGINA
+  const indiceFimComerciais = paginaComerciais * ITENS_POR_PAGINA
+  const comerciaisVisiveis = comerciaisFiltrados.slice(indiceInicioComerciais, indiceFimComerciais)
+
+  // 3. MATEMÁTICA DA PAGINAÇÃO PARA CONSTRUTIVOS
+  const construtivosFiltrados = filtrarMateriais(materials.construtivos, buscaConstrutivos)
+  const totalPaginasConstrutivos = Math.ceil(construtivosFiltrados.length / ITENS_POR_PAGINA)
+  const indiceInicioConstrutivos = (paginaConstrutivos - 1) * ITENS_POR_PAGINA
+  const indiceFimConstrutivos = paginaConstrutivos * ITENS_POR_PAGINA
+  const construtivosVisiveis = construtivosFiltrados.slice(indiceInicioConstrutivos, indiceFimConstrutivos)
 
   return (
     <div className="modal-overlay active" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
@@ -111,18 +162,42 @@ export default function ModalDetalhes({ card, onClose }) {
             {showCommercial && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={DollarSign} title="Comerciais" status={card.stages?.Comerciais} />
+                
+                <div className="keyword-filter" style={{ marginBottom: '1rem', width: '100%' }}>
+                  <Search className="filter-search-icon icon-sm" />
+                  <input
+                    type="text"
+                    placeholder="Procurar por palavra chave..."
+                    className="filter-input"
+                    value={buscaComerciais}
+                    onChange={e => {
+                      setBuscaComerciais(e.target.value)
+                      setPaginaComerciais(1)
+                    }}
+                  />
+                </div>
+
                 <CaixaExpansivel 
                   titulo="Itens Comerciais" 
-                  contagem={materials.comerciais.length}
+                  contagem={comerciaisFiltrados.length}
                 >
-                  {materials.comerciais.length > 0 ? (
-                    <div className="material-list">
-                      {materials.comerciais.map((item, index) => (
-                        <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="commercial" />
-                      ))}
-                    </div>
+                  {comerciaisVisiveis.length > 0 ? (
+                    <>
+                      <div className="material-list">
+                        {comerciaisVisiveis.map((item, index) => (
+                          <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="commercial" />
+                        ))}
+                      </div>
+                      
+                      {/* INSERÇÃO DOS BOTÕES DE PAGINAÇÃO */}
+                      <ControlesPaginacao 
+                        paginaAtual={paginaComerciais} 
+                        totalPaginas={totalPaginasComerciais} 
+                        onMudarPagina={setPaginaComerciais} 
+                      />
+                    </>
                   ) : (
-                    <EmptyMessage>Nenhum item comercial associado a esta transmissão.</EmptyMessage>
+                    <EmptyMessage>Nenhum item comercial encontrado para esta pesquisa.</EmptyMessage>
                   )}
                 </CaixaExpansivel>
               </section>
@@ -131,18 +206,42 @@ export default function ModalDetalhes({ card, onClose }) {
             {showConstructive && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={Wrench} title="Construtivos" status={card.stages?.Construtivos} />
+                
+                <div className="keyword-filter" style={{ marginBottom: '1rem', width: '100%' }}>
+                  <Search className="filter-search-icon icon-sm" />
+                  <input
+                    type="text"
+                    placeholder="Procurar por palavra chave..."
+                    className="filter-input"
+                    value={buscaConstrutivos}
+                    onChange={e => {
+                      setBuscaConstrutivos(e.target.value)
+                      setPaginaConstrutivos(1)
+                    }}
+                  />
+                </div>
+
                 <CaixaExpansivel 
                   titulo="Itens Construtivos" 
-                  contagem={materials.construtivos.length}
+                  contagem={construtivosFiltrados.length}
                 >
-                  {materials.construtivos.length > 0 ? (
-                    <div className="material-list">
-                      {materials.construtivos.map((item, index) => (
-                        <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="constructive" />
-                      ))}
-                    </div>
+                  {construtivosVisiveis.length > 0 ? (
+                    <>
+                      <div className="material-list">
+                        {construtivosVisiveis.map((item, index) => (
+                          <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="constructive" />
+                        ))}
+                      </div>
+
+                      {/* INSERÇÃO DOS BOTÕES DE PAGINAÇÃO */}
+                      <ControlesPaginacao 
+                        paginaAtual={paginaConstrutivos} 
+                        totalPaginas={totalPaginasConstrutivos} 
+                        onMudarPagina={setPaginaConstrutivos} 
+                      />
+                    </>
                   ) : (
-                    <EmptyMessage>Nenhum item construtivo associado a esta transmissão.</EmptyMessage>
+                    <EmptyMessage>Nenhum item construtivo encontrado para esta pesquisa.</EmptyMessage>
                   )}
                 </CaixaExpansivel>
                 
@@ -185,7 +284,69 @@ export default function ModalDetalhes({ card, onClose }) {
   )
 }
 
-/* --- NOVO COMPONENTE: Caixa Expansível (Acordeão) --- */
+// ==========================================
+// COMPONENTES AUXILIARES
+// ==========================================
+
+// 4. NOVO COMPONENTE DE PAGINAÇÃO: Renderiza os números das páginas e botões Anterior/Próximo
+function ControlesPaginacao({ paginaAtual, totalPaginas, onMudarPagina }) {
+  if (totalPaginas <= 1) return null
+
+  const botoesPagina = []
+  for (let i = 1; i <= totalPaginas; i++) {
+    const isAtiva = paginaAtual === i
+    botoesPagina.push(
+      <button
+        key={i}
+        onClick={() => onMudarPagina(i)}
+        style={{
+          margin: '0 0.2rem',
+          padding: '0.35rem 0.65rem',
+          border: '1px solid',
+          borderColor: isAtiva ? 'var(--cyan-mid)' : 'var(--border-mid)',
+          background: isAtiva ? 'var(--cyan-mid)' : 'var(--surface)',
+          color: isAtiva ? '#fff' : 'var(--text-main)',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: '0.75rem',
+          transition: 'all 0.2s'
+        }}
+        aria-label={`Página ${i}`}
+        aria-current={isAtiva ? 'page' : undefined}
+      >
+        {i}
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem', gap: '0.5rem' }}>
+      <button
+        disabled={paginaAtual === 1}
+        onClick={() => onMudarPagina(paginaAtual - 1)}
+        className="btn-outline"
+        style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: paginaAtual === 1 ? 0.5 : 1 }}
+      >
+        Anterior
+      </button>
+      
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {botoesPagina}
+      </div>
+      
+      <button
+        disabled={paginaAtual === totalPaginas}
+        onClick={() => onMudarPagina(paginaAtual + 1)}
+        className="btn-outline"
+        style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: paginaAtual === totalPaginas ? 0.5 : 1 }}
+      >
+        Próximo
+      </button>
+    </div>
+  )
+}
+
 function CaixaExpansivel({ titulo, contagem, children }) {
   const [aberto, setAberto] = useState(false)
 
@@ -212,7 +373,6 @@ function CaixaExpansivel({ titulo, contagem, children }) {
     </div>
   )
 }
-/* --------------------------------------------------- */
 
 function SectionTitle({ icon: Icon, title, status }) {
   const theme = getTheme(status)
@@ -251,6 +411,8 @@ function EngineeringSubsection({ id, title, status, expanded, selected, onClick,
   )
 }
 
+// Substitui apenas a função MaterialCard no ficheiro ModalDetalhes.jsx
+
 function MaterialCard({ item, category }) {
   const isCommercial = category === 'commercial'
   const manufacturerLabel = isCommercial ? 'Fabricante' : 'Fornecedor'
@@ -258,13 +420,20 @@ function MaterialCard({ item, category }) {
     ? item.fabricante
     : (item.fornecedores?.length ? item.fornecedores.join(', ') : (item.fornecedor || item.fabricante))
 
+  // LÓGICA DE CORES: Define a classe base e adiciona o verde se for antecipado
+  let cardClass = isCommercial ? 'material-commercial' : 'material-constructive'
+  if (item.tag) {
+    cardClass += ' material-anticipated'
+  }
+
   return (
-    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'}`}>
+    <article className={`material-card ${cardClass}`}>
       <div className="material-card-heading">
         <div>
           <div className="material-type-label">{isCommercial ? 'Material comercial' : 'Material construtivo'}</div>
           <h4 className="material-description">{item.descricao || 'Descrição não informada'}</h4>
         </div>
+        {/* A etiqueta verde no canto superior direito mantém-se */}
         {item.tag && <span className="anticipation-tag">{item.tag}</span>}
       </div>
 

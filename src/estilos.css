@@ -1735,3 +1735,26 @@ body {
   font-weight: 900;
   letter-spacing: .04em;
 }
+
+/* ══════════════════════════════════════════
+   CORES DOS DEPARTAMENTOS (IDENTIDADE VISUAL)
+══════════════════════════════════════════ */
+.cor-engenharia   { color: #0ea5e9; } /* Azul Celeste */
+.cor-comerciais   { color: #8b5cf6; } /* Roxo */
+.cor-construtivos { color: #f97316; } /* Laranja */
+.cor-manufatura   { color: #6366f1; } /* Índigo */
+
+.stage-department-icon {
+  width: 1.1rem !important;
+  height: 1.1rem !important;
+  opacity: 0.95 !important;
+}
+
+/* ══════════════════════════════════════════
+   ESTILO PARA CARTÕES ANTECIPADOS
+══════════════════════════════════════════ */
+.material-anticipated {
+  border-left-color: var(--success) !important;
+  border-color: rgba(5, 150, 105, 0.3) !important;
+  background: var(--success-bg) !important;
+}

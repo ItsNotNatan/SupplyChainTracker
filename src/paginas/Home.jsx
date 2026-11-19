@@ -4,7 +4,7 @@ export default function Home({ onOpenSupplyChain, onOpenDatabase, hasData }) {
   return (
     <section className="home-page" aria-labelledby="home-title">
       <div className="home-intro">
-        <span className="home-eyebrow">COMAU · SITE</span>
+        {/* O texto "COMAU · SITE" que ficava aqui foi removido com sucesso. */}
         <h2 id="home-title">Supply Chain Tracker</h2>
         <p>Selecione a área que deseja acessar.</p>
       </div>
@@ -31,10 +31,7 @@ export default function Home({ onOpenSupplyChain, onOpenDatabase, hasData }) {
         </button>
       </div>
 
-      <p className="home-storage-note">
-        Nesta versão, os arquivos importados ficam disponíveis somente durante a sessão atual do navegador.
-        O armazenamento compartilhado entre usuários exige a conexão com um backend e um banco de dados.
-      </p>
+      {/* A nota de rodapé sobre o armazenamento dos arquivos foi removida daqui. */}
     </section>
   )
 }

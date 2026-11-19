@@ -53,6 +53,15 @@ export default function Visualizacao({
   onOpenDatabase
 }) {
   const [page, setPage] = useState(1)
+  
+  // NOVO ESTADO: Guarda em que aba o modal deve iniciar
+  const [initialTab, setInitialTab] = useState('All')
+
+  // NOVA FUNÇÃO: Intercepta o clique do cartão para guardar a aba antes de abrir
+  const handleCardClick = (card, tab = 'All') => {
+    setInitialTab(tab)
+    onSelectCard(card)
+  }
 
   const filtered = useMemo(() => {
     const keyword = normalizeSearch(filters.palavraChave)
@@ -169,7 +178,7 @@ export default function Visualizacao({
                   <CardTransmissao
                     key={card.id}
                     card={card}
-                    onSelect={onSelectCard}
+                    onSelect={handleCardClick} // ATUALIZADO: Chama a nossa nova função
                     index={index}
                   />
                 ))}
@@ -188,7 +197,8 @@ export default function Visualizacao({
         </div>
       </div>
 
-      {selectedCard && <ModalDetalhes card={selectedCard} onClose={onCloseModal} />}
+      {/* ATUALIZADO: Passa a initialTab para o Modal */}
+      {selectedCard && <ModalDetalhes card={selectedCard} initialTab={initialTab} onClose={onCloseModal} />}
     </>
   )
 }

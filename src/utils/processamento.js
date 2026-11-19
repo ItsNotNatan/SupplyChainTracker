@@ -83,7 +83,6 @@ function createHeaderInfo(rows = []) {
         mergedHeading = normalizeText(value)
         headerParts[columnIndex].push(mergedHeading)
       } else if (rowIndex < bestRow && mergedHeading) {
-        // Cabeçalhos agrupados/mesclados: replica o título do grupo nas colunas seguintes.
         headerParts[columnIndex].push(mergedHeading)
       }
     }
@@ -98,8 +97,6 @@ function findColumn(headers, aliases = [], excluded = []) {
   const normalizedExcluded = excluded.map(normalizeText).filter(Boolean)
 
   const matchesAlias = (header, alias) => {
-    // Abreviações curtas (RC, PO, PN, QTD) precisam ser palavras inteiras.
-    // Assim, "PO" não encontra por engano a coluna "Tipo".
     if (alias.length <= 3) return header.split(' ').includes(alias)
     return header.includes(alias)
   }
@@ -123,7 +120,6 @@ function readField(row, headerInfo, aliases, fallbackIndex = -1) {
 
 function readDate(value) {
   if (!hasValue(value)) return null
-  // Rótulos de semana (ex.: WK-06) não são datas; o ano/calendário deve vir da planilha.
   if (/^(?:wk|week|semana)\s*[-_/ ]?\s*\d{1,2}(?:\s*[-_/ ]\s*\d{2,4})?$/i.test(String(value).trim())) return null
   const date = excelToJSDate(value)
   return date && !Number.isNaN(date.getTime()) ? date : null
@@ -147,10 +143,6 @@ function readDateTriple(row, headerInfo, milestoneAliases) {
 
 function readExtraDate(row, headerInfo, aliases) {
   const headers = headerInfo?.headers ?? []
-
-  // As datas complementares vêm de outras planilhas e são campos de data simples,
-  // não marcos com Planeado/Previsto/Realizado. Se a fonte trouxer as três versões,
-  // usa-se a mais atual disponível, nesta ordem: Realizado, Previsto e Planeado.
   for (const period of ['realizado', 'previsto', 'planejado']) {
     const index = findMilestoneColumn(headers, aliases, PERIOD_ALIASES[period])
     if (index >= 0) {
@@ -177,8 +169,6 @@ function createMaterial(row, headerInfo, typeRaw, card) {
     ? (classificationText.includes('ja antecipado') ? 'Já antecipado' : 'Antecipação')
     : null
 
-  // A antecipação sempre prevalece: mesmo que a coluna de classe esteja como
-  // Construtivo, os itens Antecipação/Já antecipado pertencem a Comerciais.
   const isConstructive = !isAnticipated && (typeText.includes('construt') || typeText.includes('construct') || typeText.includes('custom'))
   const isCommercial = isAnticipated || typeText.includes('comercial') || typeText.includes('commercial')
 
@@ -232,7 +222,6 @@ function createMaterial(row, headerInfo, typeRaw, card) {
 
 function addMaterialIfUnique(target, material) {
   const key = `${normalizeText(material.referencia)}|${normalizeText(material.descricao)}`
-  // Sem referência e sem descrição não há uma chave segura para deduplicação.
   if (key === '|') {
     target.push(material)
     return
@@ -244,8 +233,6 @@ function addMaterialIfUnique(target, material) {
     return
   }
 
-  // Um mesmo construtivo pode receber cotação de mais de um fornecedor.
-  // Não descarte a segunda linha: consolide os fornecedores no mesmo item.
   existing.fornecedoresDetalhes ??= []
   for (const detail of material.fornecedoresDetalhes ?? []) {
     const current = existing.fornecedoresDetalhes.find(item => normalizeText(item.nome) === normalizeText(detail.nome))
@@ -267,7 +254,6 @@ function addMaterialIfUnique(target, material) {
   existing.fornecedores = Array.from(new Set(supplierValues))
   existing.fornecedor = existing.fornecedores.join(', ')
 
-  // Preenche dados ainda vazios sem sobrescrever informações já importadas.
   for (const field of ['qtd', 'fabricante', 'statusLiberacao', 'rc', 'po', 'nf', 'pull']) {
     if (!hasValue(existing[field]) && hasValue(material[field])) existing[field] = material[field]
   }
@@ -359,7 +345,6 @@ export function processarDados(sheets = {}) {
     return trMap.get(id)
   }
 
-  // 1. Risco/saturação de fornecedores
   const saturationInfo = createHeaderInfo(safeSheets.saturacao)
   safeSheets.saturacao.slice(saturationInfo.dataStart).forEach(row => {
     if (!Array.isArray(row) || !row.length) return
@@ -373,7 +358,6 @@ export function processarDados(sheets = {}) {
     })
   })
 
-  // 2. Bordo de Máquina / dados de manufatura
   const manufacturingRows = safeSheets.pcpManufacturing.length ? safeSheets.pcpManufacturing : safeSheets.bordomaquina
   const boardInfo = createHeaderInfo(manufacturingRows)
   manufacturingRows.slice(boardInfo.dataStart).forEach(row => {
@@ -393,7 +377,7 @@ export function processarDados(sheets = {}) {
     const deliveryRaw = readField(row, boardInfo, deliveryAliases, deliveryFallbackIndex)
     const deliveryDate = readDate(deliveryRaw)
     const deliveryTriple = readDateTriple(row, boardInfo, ['entrega do dispositivo', 'entrega dispositivo', 'data entrega dispositivo', 'device delivery', 'delivery of device'])
-    // A data prometida pelo PCP alimenta a previsão; realizado só vem de um campo real explícito.
+    
     if (!deliveryTriple.previsto) deliveryTriple.previsto = deliveryDate
 
     const projectElectrical = readField(row, boardInfo, ['projeto eletrico', 'proj ele'], safeSheets.pcpManufacturing.length ? -1 : 6)
@@ -438,7 +422,6 @@ export function processarDados(sheets = {}) {
     card.manufatura.entregaDispositivo = deliveryTriple
   })
 
-  // 3. Follow-up: projeto, linha, estratégia e dados construtivos
   const followInfo = createHeaderInfo(safeSheets.followUp)
   safeSheets.followUp.slice(followInfo.dataStart).forEach(row => {
     if (!Array.isArray(row) || row.length < 5) return
@@ -506,7 +489,6 @@ export function processarDados(sheets = {}) {
     if (hasValue(measurement3D)) card.manufatura.medicao3D = String(measurement3D).trim()
   })
 
-  // 4. Sourcing Plan: classificação (coluna B) e transmissão (coluna M)
   safeSheets.sourcingPlans.forEach(sourcingTable => {
     const sourcingInfo = createHeaderInfo(sourcingTable)
     sourcingTable.slice(sourcingInfo.dataStart).forEach(row => {
@@ -531,7 +513,6 @@ export function processarDados(sheets = {}) {
     })
   })
 
-  // 5. Abas legadas Comerciais/PRPO (mantidas como compatibilidade)
   const processLegacyCommercialSheet = (sheet) => {
     if (!Array.isArray(sheet) || sheet.length === 0) return
     const info = createHeaderInfo(sheet)
@@ -564,20 +545,12 @@ export function processarDados(sheets = {}) {
         pull: readField(row, info, ['pull', 'pull system'], 14) || ''
       }
       addMaterialIfUnique(card.materiais.comerciais, material)
-
-      const freight = readField(row, info, ['incoterm', 'frete'], 21)
-      const costCenter = readField(row, info, ['centro de custo', 'wbs'], 19)
-      const cargoDate = readDate(readField(row, info, ['data presenca carga', 'presenca carga'], 25))
-      if (hasValue(freight)) card.logisticaAdvanced.frete = freight
-      if (hasValue(costCenter)) card.logisticaAdvanced.cc = costCenter
-      if (cargoDate) card.logisticaAdvanced.presencaCarga = cargoDate
     })
   }
 
   safeSheets.comerciais.forEach(processLegacyCommercialSheet)
   if (safeSheets.prpo.length) processLegacyCommercialSheet(safeSheets.prpo)
 
-  // 6. Fallback construtivo para transmissões que ainda não têm a linha do Sourcing Plan
   trMap.forEach(card => {
     if (card.construtivo && card.materiais.construtivos.length === 0) {
       const constructive = card.construtivo
@@ -606,7 +579,6 @@ export function processarDados(sheets = {}) {
     }
   })
 
-  // 7. Status individuais das quatro classes (não existe status global)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -690,6 +662,20 @@ export const DEMO_SHEETS = {
     ['Comercial', 4, 'Sensor M12', 'PN123', 'Phoenix Contact', 'Liberado', 'RC-001', 'PO-001', 46000, 46010, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
     ['Construtivo', 2, 'Suporte de fixação', 'SUP-002', '', 'Em cotação', 'RC-002', '', 46000, 46020, '', 'STW', 'BB37-VW-ANCH-STW-UB2-0002-2025'],
     ['Antecipação', 1, 'Conector M12 antecipado', 'PN-ANT-1', 'Phoenix Contact', 'Liberado', 'RC-003', 'PO-003', 46000, 46002, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Já antecipado', 3, 'Cabo já antecipado', 'PN-ANT-2', 'Siemens', 'Liberado', 'RC-004', 'PO-004', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025']
+    ['Já antecipado', 3, 'Cabo já antecipado', 'PN-ANT-2', 'Siemens', 'Liberado', 'RC-004', 'PO-004', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    
+    // NOVOS ITENS INJETADOS PARA ATIVAR A PAGINAÇÃO (Total > 12 itens)
+    ['Comercial', 1, 'Fonte de Alimentação 24V 10A', 'PWR-24-10', 'Siemens', 'Liberado', 'RC-005', 'PO-005', 46000, 46005, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 2, 'Módulo de I/O Digital', 'IO-DIG-32', 'Festo', 'Em andamento', 'RC-006', '', 46000, 46015, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 1, 'CLP Principal', 'PLC-S7-1500', 'Siemens', 'Atrasado', 'RC-007', '', 46000, 46001, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 10, 'Relé Auxiliar 24V', 'REL-24V', 'Finder', 'Liberado', 'RC-008', 'PO-008', 46000, 46002, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 5, 'Contator de Potência', 'CONT-9A', 'Schneider', 'Liberado', 'RC-009', 'PO-009', 46000, 46005, 46004, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 2, 'Disjuntor Motor', 'DISJ-M-4A', 'Schneider', 'Em cotação', 'RC-010', '', 46000, 46012, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 50, 'Borne de Passagem 2.5mm', 'BORN-2.5', 'Weidmüller', 'Liberado', 'RC-011', 'PO-011', 46000, 46003, 46002, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 1, 'Switch Ethernet Industrial 8 portas', 'SWI-ETH-8', 'Cisco', 'Liberado', 'RC-012', 'PO-012', 46000, 46005, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 4, 'Cabo Profinet 5m', 'CBL-PN-5M', 'Lapp Kabel', 'Liberado', 'RC-013', 'PO-013', 46000, 46006, 46004, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 2, 'IHM Touch 7"', 'HMI-7-TOUCH', 'Siemens', 'Em cotação', 'RC-014', '', 46000, 46020, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 1, 'Sinalizador Luminoso 3 Cores', 'TOW-3C', 'Banner', 'Liberado', 'RC-015', 'PO-015', 46000, 46002, 46002, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
+    ['Comercial', 1, 'Botão de Emergência', 'BTN-EMG', 'Eaton', 'Liberado', 'RC-016', 'PO-016', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025']
   ]]
 }
