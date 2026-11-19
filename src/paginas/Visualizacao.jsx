@@ -1,41 +1,67 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Filter, SearchX, ChevronDown } from 'lucide-react'
+import { Filter, SearchX, ChevronDown, Search } from 'lucide-react'
 import CardTransmissao from '../componentes/CardTransmissao.jsx'
 import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
-import { useAnimatedCounter } from '../utils/useAnimatedCounter.js'
 
 const PAGE_SIZE = 48
+
+function normalizeSearch(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function getSearchText(card) {
+  const materialValues = [
+    ...(card.materiais?.comerciais ?? []),
+    ...(card.materiais?.construtivos ?? [])
+  ].flatMap(item => [item.descricao, item.referencia, item.fabricante, item.fornecedor, item.rc, item.po, item.tag])
+
+  return normalizeSearch([
+    card.id,
+    card.projeto,
+    card.projetoWBS,
+    card.cliente,
+    card.linha,
+    card.operacao,
+    card.descricao,
+    card.construtivo?.fornecedor,
+    card.manufatura?.estrategia,
+    ...materialValues
+  ].filter(Boolean).join(' '))
+}
 
 export default function Visualizacao({
   processedData,
   filters,
   onFilterChange,
-  uniqueWBS,
+  uniqueProjetos,
   uniqueLinhas,
+  uniqueOperacoes,
   selectedCard,
   onSelectCard,
   onCloseModal
 }) {
   const [page, setPage] = useState(1)
 
-  const filtered = useMemo(() => processedData.filter(c =>
-    (c.id.toLowerCase().includes(filters.transmissao) ||
-     c.descricao.toLowerCase().includes(filters.transmissao)) &&
-    (filters.wbs     === '' || c.projetoWBS === filters.wbs)  &&
-    (filters.linha   === '' || c.linhaOp  === filters.linha)  &&
-    (filters.status  === 'all' || c.overallStatus === filters.status)
-  ), [processedData, filters])
+  const filtered = useMemo(() => {
+    const keyword = normalizeSearch(filters.palavraChave)
+    return processedData.filter(card => {
+      const keywordMatch = !keyword || getSearchText(card).includes(keyword)
+      const projectMatch = !filters.projeto || card.projeto === filters.projeto
+      const lineMatch = !filters.linha || card.linha === filters.linha
+      const operationMatch = !filters.operacao || card.operacao === filters.operacao
+      return keywordMatch && projectMatch && lineMatch && operationMatch
+    })
+  }, [processedData, filters])
 
   useEffect(() => { setPage(1) }, [filtered])
 
   const visible = useMemo(() => filtered.slice(0, page * PAGE_SIZE), [filtered, page])
-  const hasMore  = filtered.length > visible.length
+  const hasMore = filtered.length > visible.length
   const remaining = filtered.length - visible.length
-
-  const total    = processedData.length
-  const ongoing  = useMemo(() => processedData.filter(c => c.overallStatus === 'Ongoing').length,    [processedData])
-  const delayed  = useMemo(() => processedData.filter(c => c.overallStatus === 'On delayed').length, [processedData])
-  const complete = useMemo(() => processedData.filter(c => c.overallStatus === 'Complete').length,   [processedData])
 
   return (
     <>
@@ -44,48 +70,62 @@ export default function Visualizacao({
           <div className="filter-label">
             <Filter className="icon-sm" /> Filtros
           </div>
-          <input
-            type="text"
-            placeholder="Procurar transmissão / part number..."
-            className="filter-input"
-            value={filters.transmissao}
-            onChange={e => onFilterChange('transmissao', e.target.value.toLowerCase())}
-          />
+          <div className="keyword-filter">
+            <Search className="filter-search-icon icon-sm" />
+            <input
+              type="text"
+              placeholder="Procurar por palavra chave"
+              aria-label="Procurar por palavra chave"
+              className="filter-input"
+              value={filters.palavraChave}
+              onChange={event => onFilterChange('palavraChave', event.target.value)}
+            />
+          </div>
           <select
             className="filter-select"
-            value={filters.wbs}
-            onChange={e => onFilterChange('wbs', e.target.value)}
+            value={filters.projeto}
+            onChange={event => onFilterChange('projeto', event.target.value)}
+            aria-label="Filtrar por projeto"
           >
-            <option value="">Todos os Projetos WBS</option>
-            {Array.from(uniqueWBS).sort().map(w => (
-              <option key={w} value={w}>{w}</option>
+            <option value="">Todos os projetos</option>
+            {Array.from(uniqueProjetos).sort().map(project => (
+              <option key={project} value={project}>{project}</option>
             ))}
           </select>
           <select
             className="filter-select"
             value={filters.linha}
-            onChange={e => onFilterChange('linha', e.target.value)}
+            onChange={event => onFilterChange('linha', event.target.value)}
+            aria-label="Filtrar por linha"
           >
-            <option value="">Todas as Linhas / OP</option>
-            {Array.from(uniqueLinhas).sort().map(l => (
-              <option key={l} value={l}>{l}</option>
+            <option value="">Todas as linhas</option>
+            {Array.from(uniqueLinhas).sort().map(line => (
+              <option key={line} value={line}>{line}</option>
+            ))}
+          </select>
+          <select
+            className="filter-select"
+            value={filters.operacao}
+            onChange={event => onFilterChange('operacao', event.target.value)}
+            aria-label="Filtrar por operação"
+          >
+            <option value="">Todas as operações</option>
+            {Array.from(uniqueOperacoes).sort().map(operation => (
+              <option key={operation} value={operation}>{operation}</option>
             ))}
           </select>
         </div>
 
-        <div className="stats-grid">
-          <StatCard label="Total Transmissões" value={total}    color="blue"   active={filters.status === 'all'}        onClick={() => onFilterChange('status', 'all')} />
-          <StatCard label="Em Andamento"       value={ongoing}  color="yellow" active={filters.status === 'Ongoing'}    onClick={() => onFilterChange('status', 'Ongoing')} />
-          <StatCard label="Atrasados / Risco"  value={delayed}  color="red"    active={filters.status === 'On delayed'} onClick={() => onFilterChange('status', 'On delayed')} />
-          <StatCard label="Concluídos (E2E)"   value={complete} color="green"  active={filters.status === 'Complete'}   onClick={() => onFilterChange('status', 'Complete')} />
+        <div className="cards-result-count">
+          {filtered.length} {filtered.length === 1 ? 'transmissão encontrada' : 'transmissões encontradas'}
         </div>
 
         <div className="cards-wrapper">
           {filtered.length === 0 ? (
             <div className="empty-state">
               <SearchX className="icon-xl" />
-              <p style={{ fontWeight: 600 }}>Nenhum resultado para os filtros selecionados.</p>
-              <p style={{ fontSize: '.8rem' }}>Tente remover um ou mais filtros.</p>
+              <p style={{ fontWeight: 600 }}>Nenhuma transmissão encontrada.</p>
+              <p style={{ fontSize: '.8rem' }}>Altere ou limpe um dos filtros para ver outros resultados.</p>
             </div>
           ) : (
             <>
@@ -102,24 +142,10 @@ export default function Visualizacao({
 
               {hasMore && (
                 <div className="load-more-bar">
-                  <span className="load-more-count">
-                    Exibindo {visible.length} de {filtered.length} transmissões
-                  </span>
-                  <button
-                    className="btn-load-more"
-                    onClick={() => setPage(p => p + 1)}
-                  >
-                    <ChevronDown className="icon-sm" />
-                    Carregar mais {Math.min(PAGE_SIZE, remaining)}
+                  <span className="load-more-count">Exibindo {visible.length} de {filtered.length} transmissões</span>
+                  <button className="btn-load-more" onClick={() => setPage(current => current + 1)}>
+                    <ChevronDown className="icon-sm" /> Carregar mais {Math.min(PAGE_SIZE, remaining)}
                   </button>
-                </div>
-              )}
-
-              {!hasMore && filtered.length > PAGE_SIZE && (
-                <div className="load-more-bar">
-                  <span className="load-more-count">
-                    Todas as {filtered.length} transmissões exibidas
-                  </span>
                 </div>
               )}
             </>
@@ -127,22 +153,7 @@ export default function Visualizacao({
         </div>
       </div>
 
-      {selectedCard && (
-        <ModalDetalhes card={selectedCard} onClose={onCloseModal} />
-      )}
+      {selectedCard && <ModalDetalhes card={selectedCard} onClose={onCloseModal} />}
     </>
-  )
-}
-
-function StatCard({ label, value, color, active, onClick }) {
-  const animated = useAnimatedCounter(value)
-  return (
-    <div
-      className={`stat-card ${color} ${active ? 'selected' : ''}`}
-      onClick={onClick}
-    >
-      <div className="stat-title">{label}</div>
-      <div className="stat-value">{animated}</div>
-    </div>
   )
 }

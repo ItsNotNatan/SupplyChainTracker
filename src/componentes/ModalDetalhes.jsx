@@ -1,244 +1,156 @@
 import { useEffect, useState } from 'react'
 import {
-  X, Folder, Tag, Layers, AlertTriangle,
-  PenTool, Wrench, Factory, Truck, ShoppingCart,
-  Hash, FileText, FileCheck2, Receipt, MapPin
+  X, Folder, Hash, PenTool, DollarSign, Wrench, Factory, ChevronDown, ChevronUp
 } from 'lucide-react'
-import { getTheme, formatDate, formatCur } from '../utils/formatadores.js'
+import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
+
+const MATERIAL_MILESTONES = [
+  { key: 'liberacao', label: 'Liberação' },
+  { key: 'insercaoTarefa', label: 'Inserção de tarefa' },
+  { key: 'requisicao', label: 'Requisição' },
+  { key: 'pedido', label: 'Pedido' }
+]
+
+const COMPLEMENTARY_MILESTONES = [
+  { key: 'entregaComau', label: 'Data de entrega na COMAU' },
+  { key: 'criacaoPS', label: 'Data da criação do P&S' },
+  { key: 'entregaUsuario', label: 'Data de entrega ao usuário' }
+]
 
 export default function ModalDetalhes({ card, onClose }) {
   const [activeTab, setActiveTab] = useState('All')
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  useEffect(() => setActiveTab('All'), [card?.id])
 
   if (!card) return null
 
-  const oT = getTheme(card.overallStatus)
-  const { Icon: StatusIcon } = oT
-
-  const rPerc = card.riscoFornecedor.saturacaoPerc * 100
-  const satClass = rPerc > 80 ? 'badge-sat-red' : (rPerc > 50 ? 'badge-sat-yellow' : 'badge-sat-green')
-
-  const isFiltered = activeTab !== 'All'
-  const showEng = !isFiltered || activeTab === 'EngMecanica' || activeTab === 'EngControls'
-  const showConst = !isFiltered || activeTab === 'Constructives'
-  const showMfg = !isFiltered || activeTab === 'Manufacturing'
-  const showFinLog = !isFiltered || activeTab === 'Delivery' || activeTab === 'Commercial'
-  const showPurch = !isFiltered || activeTab === 'Purchasing' || activeTab === 'Commercial'
+  const showAll = activeTab === 'All'
+  const showEngineering = showAll || activeTab === 'Engenharia'
+  const showCommercial = showAll || activeTab === 'Comerciais'
+  const showConstructive = showAll || activeTab === 'Construtivos'
+  const showManufacturing = showAll || activeTab === 'Manufatura'
+  const materials = card.materiais ?? { comerciais: [], construtivos: [] }
 
   return (
-    <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="modal-overlay active" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
       <div className="modal-content">
-
         <div className="modal-header">
           <div className="modal-header-info">
-            <span className="card-tag">{card.cliente} | {card.linhaOp}</span>
-            <h2 className="modal-title">{card.id}</h2>
-            <p className="card-desc" style={{ marginBottom: '0.5rem' }}>{card.descricao}</p>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span className="badge-outline"><Folder className="icon-sm" /> {card.projetoWBS}</span>
-              <span className="badge-outline"><Tag className="icon-sm" /> Rev: {card.construtivo?.rev ?? '-'}</span>
-              <span className="badge-outline"><Layers className="icon-sm" /> {card.construtivo?.makeBuy ?? 'N/A'}</span>
-              {card.construtivo?.prioridade && (
-                <span className="badge-outline priority-high">
-                  <AlertTriangle className="icon-sm" /> Prioridade: {card.construtivo.prioridade}
-                </span>
-              )}
+            <div className="modal-eyebrow"><Folder className="icon-sm" /> Projeto: {card.projeto || 'Não informado'}</div>
+            <h2 className="modal-title">ID: {card.id}</h2>
+            <p className="modal-description"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
+            <div className="modal-tags">
+              <span className="badge-outline">Linha: {card.linha || '—'}</span>
+              <span className="badge-outline">Operação: {card.operacao || '—'}</span>
+              <span className="badge-outline"><Hash className="icon-sm" /> Qtd: {card.qtd || 1}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1rem' }}>
-            <button className="modal-close" onClick={onClose}><X className="icon-md" /></button>
-            <div className={`card-status-badge ${oT.bg}`}>
-              {StatusIcon && <StatusIcon className="icon-sm" />}
-              Status Global: {oT.t}
-            </div>
-          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Fechar detalhes">
+            <X className="icon-md" />
+          </button>
         </div>
 
         <div className="modal-body">
-          <ArvoreHierarquia 
-            stages={card.stages} 
-            activeTab={activeTab} 
-            onTabChange={setActiveTab} 
-          />
+          <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={setActiveTab} />
 
           <div className="details-grid">
-            {showEng && (
-              <div className={`detail-section ${isFiltered ? 'full-width' : ''}`}>
-                <h4><PenTool className="icon-sm text-purple" /> Engenharias</h4>
-                {(card.pcp || card.construtivo) ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: isFiltered ? '1fr 1fr' : '1fr', gap: isFiltered ? '2rem' : '0' }}>
-                    <div>
-                      <div style={{fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '0.2rem'}}>
-                        MECÂNICA
-                      </div>
-                      <InfoRow label="Desenho 3D" value={card.construtivo?.des3D ?? 'Pendente'} badge />
-                      <InfoRow label="Desenho 2D" value={card.construtivo?.des2D ?? 'Pendente'} badge />
-                      <InfoRow label="Estratégia" value={card.construtivo?.makeBuy ?? '-'} />
-                      <InfoRow label="Revisão" value={card.construtivo?.rev ?? '-'} />
-                      <InfoRow label="Horas Estimadas" value={`${card.construtivo?.horasPlanejadas ?? '0'} h`} />
-                    </div>
-                    <div>
-                      <div style={{fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', margin: isFiltered ? '0.2rem 0 0.5rem' : '1rem 0 0.5rem', borderTop: isFiltered ? 'none' : '1px dashed var(--border)', paddingTop: isFiltered ? '0' : '0.75rem'}}>
-                        CONTROLS
-                      </div>
-                      <InfoRow label="Projeto Elétrico" value={card.pcp?.projEle ?? 'Não Mapeado'} badge />
-                      <InfoRow label="Lista de Materiais" value={card.pcp?.listaMat ?? 'Não Mapeado'} badge />
-                      <InfoRow label="Topográfico" value={card.pcp?.projTop ?? 'Não Mapeado'} badge />
-                      <InfoRow label="Lista de Identificações" value={card.pcp?.listaIdent ?? 'Não Mapeado'} badge />
-                      <InfoRow label="Layout de Calha" value={card.pcp?.layoutCalha ?? 'Não Mapeado'} badge />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-slate text-sm">Sem dados de Engenharia.</p>
-                )}
-              </div>
-            )}
+            {showEngineering && (
+              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
+                <SectionTitle icon={PenTool} title="Engenharia" status={card.stages?.Engenharia} />
+                <div className="engineering-subgrid">
+                  <EngineeringSubsection title="Mec" status={card.subStages?.EngMecanica}>
+                    <InfoRow label="Desenho 3D" value={card.construtivo?.des3D || 'Não mapeado'} badge />
+                    <InfoRow label="Desenho 2D" value={card.construtivo?.des2D || 'Não mapeado'} badge />
+                    <InfoRow label="Lista de materiais mecânicos" value={card.pcp?.listaMatMec && card.pcp.listaMatMec !== 'Não mapeado' ? card.pcp.listaMatMec : (card.construtivo?.listaMatMec || 'Não mapeado')} badge />
+                    <InfoRow label="Revisão" value={card.construtivo?.rev || '—'} />
+                  </EngineeringSubsection>
 
-            {showConst && (
-              <div className={`detail-section ${isFiltered ? 'full-width' : ''}`}>
-                <h4><Wrench className="icon-sm text-blue" /> Construtivo Ext.</h4>
-                {card.construtivo ? (
-                  <>
-                    <InfoRow label="Fornecedor" value={card.construtivo.fornecedor} />
-                    <InfoRow
-                      label="Risco / Saturação"
-                      value={`${rPerc.toFixed(1)}% | Nota: ${card.riscoFornecedor.nota}`}
-                      badgeClass={satClass}
-                    />
-                    <InfoRow label="Resp. Follow-Up" value={card.construtivo.respFollow} />
-                    <InfoRow
-                      label="Início / Entrega Orig."
-                      value={`${formatDate(card.construtivo.inicio)} / ${formatDate(card.construtivo.entregaForn)}`}
-                    />
-                    <InfoRow
-                      label="Reprogramação"
-                      value={formatDate(card.construtivo.reprog)}
-                      className="text-red"
-                    />
-                    <div style={{ marginTop: '0.75rem', padding: '0.5rem', background: 'var(--surface-3)', border: '1px dashed var(--border-mid)', borderRadius: '0.5rem', fontSize: '0.75rem' }}>
-                      <strong>Obs. Histórico:</strong>{' '}
-                      <span className="text-slate">{card.construtivo.obs || 'S/ observações.'}</span>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-slate text-sm">Sem dados de fornecimento externo.</p>
-                )}
-              </div>
-            )}
-
-            {showMfg && (
-              <div className={`detail-section ${isFiltered ? 'full-width' : ''}`}>
-                <h4><Factory className="icon-sm text-orange" /> Bordo de Máquina (PCP)</h4>
-                {card.pcp ? (
-                  <>
-                    <InfoRow label="Local Montagem" value={card.construtivo?.localEnt ?? '-'} className="text-indigo" />
-                    <InfoRow
-                      label="Mat. Elétrico / Pneu"
-                      value={`${(parseFloat(card.pcp.matEle) * 100).toFixed(0)}% / ${(parseFloat(card.pcp.matPneu) * 100).toFixed(0)}%`}
-                    />
-                    <InfoRow label="Miscelâneas / Placa" value={`${card.pcp.misc} / ${card.pcp.placaAlum}`} />
-                    <InfoRow label="Etiquetas / QR Code" value={`${card.pcp.etiQ} / ${card.pcp.qrCode}`} />
-                    <InfoRow label="Status Testes" value={card.pcp.testes} className="text-orange" />
-                  </>
-                ) : card.construtivo ? (
-                  <>
-                    <InfoRow label="Local Montagem" value={card.construtivo?.localEnt ?? '-'} className="text-indigo" />
-                    <p className="text-slate" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>Aguardando entrada física no PCP.</p>
-                  </>
-                ) : (
-                  <p className="text-slate text-sm">Transmissão não listada no Bordo de Máquina.</p>
-                )}
-              </div>
-            )}
-
-            {showFinLog && (
-              <div className={`detail-section ${isFiltered ? 'full-width' : ''}`}>
-                <h4><Truck className="icon-sm text-green" /> Finanças & Logística</h4>
-                {(card.construtivo || card.logisticaAdvanced.cc) ? (
-                  <>
-                    <InfoRow label="Comprador" value={card.construtivo?.comercialResp ?? '-'} />
-                    <InfoRow label="Centro Custo (WBS)" value={card.logisticaAdvanced.cc || card.projetoWBS} />
-                    <InfoRow label="Valor Total Ordem" value={formatCur(card.construtivo?.valorTot)} className="text-green" />
-                    <InfoRow label="NF Construtivo" value={card.construtivo?.nf ?? '-'} />
-                    <InfoRow label="Frete (Incoterm)" value={card.logisticaAdvanced.frete || 'FOB'} />
-                    <InfoRow label="Data Presença Carga" value={formatDate(card.logisticaAdvanced.presencaCarga)} className="text-blue" />
-                  </>
-                ) : (
-                  <p className="text-slate text-sm">Sem info. financeira/PRPO.</p>
-                )}
-              </div>
-            )}
-
-            {/* SEÇÃO DE COMPRAS COM REQUISIÇÕES, PEDIDOS E BOM */}
-            {showPurch && (
-              <div className="detail-section full-width">
-                <h4><ShoppingCart className="icon-sm text-yellow" /> Compras & Suprimentos</h4>
-                
-                {card.construtivo && (
-                  <div style={{ display: 'grid', gridTemplateColumns: isFiltered ? '1fr 1fr' : '1fr 1fr', gap: '2rem', marginBottom: '1.25rem' }}>
-                    <div>
-                      <div style={{fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '0.2rem'}}>
-                        REQUISIÇÃO DE COMPRA (RC)
-                      </div>
-                      <InfoRow label="Número da RC" value={card.construtivo?.rc ?? 'Pendente'} badge />
-                      <InfoRow label="Data de Emissão (RC)" value={formatDate(card.construtivo?.dtRc)} />
-                      <InfoRow label="Data de Necessidade" value={formatDate(card.construtivo?.dtNecessidade)} className="text-yellow" />
-                    </div>
-                    <div>
-                      <div style={{fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '0.5rem', marginTop: '0.2rem'}}>
-                        PEDIDO DE COMPRA (PC / OC)
-                      </div>
-                      <InfoRow label="Número do Pedido" value={card.construtivo?.oc ?? 'Pendente'} badge />
-                      <InfoRow label="Data de Emissão (PC)" value={formatDate(card.construtivo?.dtOc)} />
-                      <InfoRow label="Previsão de Entrega" value={formatDate(card.construtivo?.entregaForn)} className="text-blue" />
-                    </div>
-                  </div>
-                )}
-
-                <div style={{fontSize: '0.65rem', fontWeight: 'bold', color: 'var(--text-muted)', margin: '0 0 0.5rem', borderTop: '1px dashed var(--border-mid)', paddingTop: '0.75rem'}}>
-                  LISTA DE MATERIAIS (BOM) - ITENS COMERCIAIS
+                  <EngineeringSubsection title="Controls" status={card.subStages?.EngControls}>
+                    <InfoRow label="Projeto elétrico" value={card.pcp?.projEle || 'Não mapeado'} badge />
+                    <InfoRow label="Lista de materiais de controls" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
+                    <InfoRow label="Topográfico" value={card.pcp?.projTop || 'Não mapeado'} badge />
+                    <InfoRow label="Lista de identificações" value={card.pcp?.listaIdent || 'Não mapeado'} badge />
+                    <InfoRow label="Layout de calha" value={card.pcp?.layoutCalha || 'Não mapeado'} badge />
+                  </EngineeringSubsection>
                 </div>
-
-                {card.comerciais.length > 0 ? (
-                  <div className="items-list">
-                    {card.comerciais.map((c, i) => (
-                      <div key={i} className="item-row">
-                        <div className="item-title">{c.desc}</div>
-                        <div className="item-meta">
-                          <span style={{ background: 'var(--surface-3)', border: 'none', fontWeight: 600 }}>
-                            <Tag className="icon-inline" /> {c.pn}
-                          </span>
-                          <span><Hash className="icon-inline" /> Qtd: {c.qtd}</span>
-                          <span><FileText className="icon-inline" /> RC: {c.rc || 'Pend.'}</span>
-                          <span className={!c.oc ? 'text-red' : 'text-green'}>
-                            <FileCheck2 className="icon-inline" /> OC: {c.oc || 'Pend.'}
-                          </span>
-                          {c.nf && (
-                            <span className="text-green">
-                              <Receipt className="icon-inline" /> NF: {c.nf}
-                            </span>
-                          )}
-                          {c.pull && (
-                            <span className="text-indigo">
-                              <MapPin className="icon-inline" /> PULL: {c.pull}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate text-sm">Nenhum item BOM associado a este processo.</p>
-                )}
-              </div>
+              </section>
             )}
 
+            {showCommercial && (
+              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
+                <SectionTitle icon={DollarSign} title="Comerciais" status={card.stages?.Comerciais} />
+                <CaixaExpansivel 
+                  titulo="Itens Comerciais" 
+                  contagem={materials.comerciais.length}
+                >
+                  {materials.comerciais.length > 0 ? (
+                    <div className="material-list">
+                      {materials.comerciais.map((item, index) => (
+                        <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="commercial" />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyMessage>Nenhum item comercial associado a esta transmissão.</EmptyMessage>
+                  )}
+                </CaixaExpansivel>
+              </section>
+            )}
+
+            {showConstructive && (
+              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
+                <SectionTitle icon={Wrench} title="Construtivos" status={card.stages?.Construtivos} />
+                <CaixaExpansivel 
+                  titulo="Itens Construtivos" 
+                  contagem={materials.construtivos.length}
+                >
+                  {materials.construtivos.length > 0 ? (
+                    <div className="material-list">
+                      {materials.construtivos.map((item, index) => (
+                        <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="constructive" />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyMessage>Nenhum item construtivo associado a esta transmissão.</EmptyMessage>
+                  )}
+                </CaixaExpansivel>
+                
+                {card.construtivo?.obs && (
+                  <div className="material-observation" style={{ marginTop: '1rem' }}>
+                    <strong>Observações do follow-up:</strong> {card.construtivo.obs}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {showManufacturing && (
+              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
+                <SectionTitle icon={Factory} title="Manufatura" status={card.stages?.Manufatura} />
+                <div className="manufacturing-fields">
+                  <InfoRow label="Estratégia" value={card.manufatura?.estrategia || 'Não mapeado'} />
+                  <InfoRow label="Montagem mecânica" value={card.manufatura?.montagemMecanica || 'Não mapeado'} />
+                  <InfoRow label="Medição 3D" value={card.manufatura?.medicao3D || 'Não mapeado'} />
+                  <InfoRow label="Bordo-máquina" value={card.manufatura?.bordoMaquina || (card.pcp ? 'Registrado no PCP' : 'Não mapeado')} />
+                  <InfoRow label="Inspeção da qualidade" value={card.manufatura?.inspecaoQualidade || card.pcp?.testes || 'Não mapeado'} />
+                  {card.construtivo?.localEnt && card.construtivo.localEnt !== '-' && (
+                    <InfoRow label="Local de montagem" value={card.construtivo.localEnt} />
+                  )}
+                </div>
+                <DateTable
+                  title="Entrega do dispositivo"
+                  dates={{ entregaDispositivo: card.manufatura?.entregaDispositivo || card.pcp?.entregaDispositivo }}
+                  milestones={[{ key: 'entregaDispositivo', label: 'Entrega do dispositivo' }]}
+                />
+              </section>
+            )}
           </div>
         </div>
       </div>
@@ -246,13 +158,179 @@ export default function ModalDetalhes({ card, onClose }) {
   )
 }
 
-function InfoRow({ label, value, badge = false, badgeClass = '', className = '' }) {
+/* --- NOVO COMPONENTE: Caixa Expansível (Acordeão) --- */
+function CaixaExpansivel({ titulo, contagem, children }) {
+  const [aberto, setAberto] = useState(false)
+
   return (
-    <div className="info-row">
-      <span className={`info-label ${className}`}>{label}:</span>
-      <span className={`info-val ${badge || badgeClass ? 'badge-status' : ''} ${badgeClass} ${className}`}>
-        {value}
-      </span>
+    <div style={{ border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '0.5rem', background: 'var(--surface)' }}>
+      <button 
+        onClick={() => setAberto(!aberto)}
+        style={{ 
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+          padding: '0.75rem 1rem', background: 'var(--surface-2)', border: 'none', 
+          cursor: 'pointer', borderBottom: aberto ? '1px solid var(--border)' : 'none',
+          fontFamily: 'inherit', color: 'var(--text-main)', fontWeight: 600
+        }}
+      >
+        <span>{titulo} <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>({contagem} itens)</span></span>
+        {aberto ? <ChevronUp className="icon-sm text-muted" /> : <ChevronDown className="icon-sm text-muted" />}
+      </button>
+      
+      {aberto && (
+        <div style={{ padding: '1rem', background: 'var(--bg)' }}>
+          {children}
+        </div>
+      )}
     </div>
   )
+}
+/* --------------------------------------------------- */
+
+function SectionTitle({ icon: Icon, title, status }) {
+  const theme = getTheme(status)
+  const StatusIcon = theme.Icon
+  return (
+    <h3 className="detail-section-title">
+      <Icon className="icon-sm" />
+      <span>{title}</span>
+      <span className={`section-status ${theme.c}`} title={`Status: ${theme.t}`} aria-label={`Status: ${theme.t}`}>
+        <StatusIcon className="icon-sm" />
+      </span>
+    </h3>
+  )
+}
+
+function EngineeringSubsection({ title, status, children }) {
+  const theme = getTheme(status)
+  const StatusIcon = theme.Icon
+  return (
+    <div className="engineering-subsection">
+      <div className="engineering-subsection-title">
+        <span>{title}</span>
+        <StatusIcon className={`icon-sm ${theme.c}`} title={`Status: ${theme.t}`} />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function MaterialCard({ item, category }) {
+  const isCommercial = category === 'commercial'
+  const manufacturerLabel = isCommercial ? 'Fabricante' : 'Fornecedor'
+  const manufacturerValue = isCommercial ? item.fabricante : (item.fornecedor || item.fabricante)
+
+  return (
+    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'}`}>
+      <div className="material-card-heading">
+        <div>
+          <div className="material-type-label">{isCommercial ? 'Material comercial' : 'Material construtivo'}</div>
+          <h4 className="material-description">{item.descricao || 'Descrição não informada'}</h4>
+        </div>
+        {item.tag && <span className="anticipation-tag">{item.tag}</span>}
+      </div>
+
+      <div className="material-fields">
+        <InfoRow label="Qtd" value={item.qtd || '—'} />
+        <InfoRow label="Referência" value={item.referencia || '—'} />
+        <InfoRow label={manufacturerLabel} value={manufacturerValue || 'Não informado'} />
+        <InfoRow label="Status da liberação" value={item.statusLiberacao || 'Não informado'} badge />
+        <InfoRow label="Nº da RC" value={item.rc || 'Não informado'} />
+        <InfoRow label="Nº da PO" value={item.po || 'Não informado'} />
+      </div>
+
+      <DateTable title="Datas de acompanhamento" dates={item.datas} milestones={MATERIAL_MILESTONES} />
+      <SingleDateTable title="Dados de outras planilhas" dates={item.datasComplementares} milestones={COMPLEMENTARY_MILESTONES} />
+
+      {(item.nf || item.pull) && (
+        <div className="material-extra-info">
+          {item.nf && <span>NF: {item.nf}</span>}
+          {item.pull && <span>PULL: {item.pull}</span>}
+        </div>
+      )}
+    </article>
+  )
+}
+
+function DateTable({ title, dates = {}, milestones, compact = false }) {
+  if (!milestones?.length) return null
+  const hasAnyDate = milestones.some(({ key }) => {
+    const triple = dates?.[key]
+    return triple && (triple.planejado || triple.previsto || triple.realizado)
+  })
+
+  return (
+    <div className={`date-table-block ${compact ? 'compact' : ''}`}>
+      <div className="date-table-heading">{title}</div>
+      <div className="date-table-scroll">
+        <table className="date-table">
+          <thead>
+            <tr>
+              <th>Marco</th>
+              <th>Planeado</th>
+              <th>Previsto</th>
+              <th>Realizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {milestones.map(({ key, label }) => {
+              const triple = dates?.[key] || {}
+              return (
+                <tr key={key}>
+                  <th scope="row">{label}</th>
+                  <td>{formatDate(triple.planejado)}</td>
+                  <td>{formatDate(triple.previsto)}</td>
+                  <td>{formatDate(triple.realizado)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!hasAnyDate && <p className="date-table-note">Datas ainda não disponíveis na base importada.</p>}
+    </div>
+  )
+}
+
+function SingleDateTable({ title, dates = {}, milestones }) {
+  if (!milestones?.length) return null
+  const hasAnyDate = milestones.some(({ key }) => dates?.[key])
+
+  return (
+    <div className="date-table-block compact">
+      <div className="date-table-heading">{title}</div>
+      <div className="date-table-scroll">
+        <table className="date-table">
+          <thead>
+            <tr>
+              <th>Informação</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {milestones.map(({ key, label }) => (
+              <tr key={key}>
+                <th scope="row">{label}</th>
+                <td>{formatDate(dates?.[key])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!hasAnyDate && <p className="date-table-note">Dados ainda não disponíveis nas planilhas de origem.</p>}
+    </div>
+  )
+}
+
+function InfoRow({ label, value, badge = false }) {
+  return (
+    <div className="info-row">
+      <span className="info-label">{label}</span>
+      <span className={`info-val ${badge ? 'badge-status' : ''}`}>{value || '—'}</span>
+    </div>
+  )
+}
+
+function EmptyMessage({ children }) {
+  return <p className="empty-message">{children}</p>
 }

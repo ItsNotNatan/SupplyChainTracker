@@ -133,6 +133,15 @@ flowchart LR
 
 ---
 
+
+## Importação das classes de acompanhamento
+
+O rastreador organiza cada transmissão em **Engenharia**, **Comerciais**, **Construtivos** e **Manufatura**. Para a classe de materiais, a importação reconhece uma aba ou arquivo chamado `Sourcing Plan` (também aceita variações simples do nome). O classificador de materiais procura a coluna de tipo/classe; quando ela não é identificada pelo cabeçalho, usa a coluna B. O ID da transmissão é procurado pelo cabeçalho e, como alternativa, pela coluna M.
+
+No `Sourcing Plan`, os cabeçalhos são identificados por nomes em português ou inglês para quantidade, descrição, referência, fabricante/fornecedor, status de liberação, RC e PO. Para datas, o sistema procura grupos **Plan / Prev / Real** (Planeado / Previsto / Realizado) nos marcos de liberação, inserção de tarefa, requisição e pedido. As datas complementares — entrega na COMAU, criação do P&S e entrega ao usuário — usam campos de data simples; a associação com outras planilhas permanece preparada, mas depende da definição dos arquivos, abas e chaves de relacionamento.
+
+Os campos sem correspondência na planilha recebida permanecem sem informação; o sistema não cria RC, PO ou datas fictícias. A estrutura está preparada para essas três datas complementares, mas a vinculação com outras planilhas depende de os respectivos arquivos/abas e cabeçalhos serem disponibilizados.
+
 ## ⚙️ Arquitetura e Fluxo de Dados
 
 O núcleo do software baseia-se em um fluxo rigoroso de tratamento de dados:

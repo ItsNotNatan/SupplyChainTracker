@@ -1,80 +1,60 @@
-import { Factory, Flag, Search, Hash } from 'lucide-react'
-import { getTheme, formatDate } from '../utils/formatadores.js'
+import { Folder, Hash, PenTool, DollarSign, Wrench, Factory } from 'lucide-react'
+import { getTheme } from '../utils/formatadores.js'
 
 const STAGES_MAP = [
-  { k: 'EngMecanica', l: 'ENG MEC' },
-  { k: 'EngControls', l: 'ENG CTRL' },
-  { k: 'Purchasing', l: 'PUR' },
-  { k: 'Commercial', l: 'COM' },
-  { k: 'Constructives', l: 'MFG Ext' },
-  { k: 'Manufacturing', l: 'MFG Int' },
-  { k: 'Delivery', l: 'DEL' }
+  { key: 'Engenharia', label: 'Engenharia', icon: PenTool },
+  { key: 'Comerciais', label: 'Comerciais', icon: DollarSign },
+  { key: 'Construtivos', label: 'Construtivos', icon: Wrench },
+  { key: 'Manufatura', label: 'Manufatura', icon: Factory }
 ]
 
 export default function CardTransmissao({ card, onSelect, index = 0 }) {
-  const theme = getTheme(card.overallStatus)
-  const { Icon: StatusIcon } = theme
+  const handleKeyDown = event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect(card)
+    }
+  }
 
   return (
-    <div
-      className={`card ${theme.b}`}
+    <article
+      className="card transmission-card"
       onClick={() => onSelect(card)}
-      style={{ animationDelay: `${Math.min(index * 55, 550)}ms` }}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir transmissão ${card.id}`}
+      style={{ animationDelay: `${Math.min(index * 40, 480)}ms` }}
     >
       <div className="card-header">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start', flex: 1, paddingRight: '0.5rem' }}>
-          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span className="card-tag">
-              {card.cliente} · {card.linhaOp}
-            </span>
-            <span className="card-tag" style={{ background: 'var(--surface-4)', color: 'var(--text-main)', borderColor: 'var(--border-hi)', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-              <Hash className="icon-inline" style={{ margin: 0, width: '0.6rem', height: '0.6rem' }} />
-              Qtd: {card.qtd || 1}
-            </span>
-          </div>
-          <h3 className="card-title">{card.id}</h3>
+        <div className="transmission-meta">
+          <span className="card-tag"><Folder className="icon-inline" /> Projeto: {card.projeto || 'Não informado'}</span>
+          <span className="card-tag">Linha: {card.linha || '—'}</span>
+          <span className="card-tag">Operação: {card.operacao || '—'}</span>
+          <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
         </div>
-        <div className={`card-status-badge ${theme.bg}`} style={{ flexShrink: 0 }}>
-          {StatusIcon && <StatusIcon className="icon-inline" style={{ margin: 0 }} />}
-        </div>
+        <span className="transmission-id">ID: {card.id}</span>
       </div>
 
-      <p className="card-desc" title={card.descricao}>
-        {card.descricao || '-'}
-      </p>
+      <p className="card-desc"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
 
-      <div className="card-stages">
-        {STAGES_MAP.map(({ k, l }) => {
-          const st = getTheme(card.stages[k])
-          const { Icon } = st
+
+      <div className="card-stages" aria-label="Status das classes">
+        {STAGES_MAP.map(({ key, label, icon: StageIcon }) => {
+          const theme = getTheme(card.stages?.[key])
+          const StatusIcon = theme.Icon
           return (
-            <div key={k} className={`stage-box ${st.bg}`}>
-              <span className="stage-title">{l}</span>
-              <div className="stage-status">
-                {Icon && <Icon className="icon-inline" />}
-                {st.t === 'N/A' ? '-' : st.t.substring(0, 4) + '.'}
+            <div key={key} className={`stage-box ${theme.c}`} title={`${label}: ${theme.t}`}>
+              <span className="stage-title">{label}</span>
+              <div className="stage-status" aria-label={`Status ${theme.t}`}>
+                <StageIcon className="stage-department-icon" />
+                <StatusIcon className="stage-status-icon" />
               </div>
             </div>
           )
         })}
       </div>
-
-      {card.construtivo && (
-        <div className="card-footer">
-          <div className="card-footer-item">
-            <Factory className="icon-inline" />
-            <span>{card.construtivo.fornecedor.substring(0, 15)}</span>
-          </div>
-          <div className="card-footer-item">
-            <Flag className="icon-inline" />
-            <span>{formatDate(card.construtivo.entregaMfg)}</span>
-          </div>
-        </div>
-      )}
-
-      <button className="view-details-btn">
-        <Search className="icon-sm" /> Detalhamento
-      </button>
-    </div>
+      <span className="card-open-hint">Clique para visualizar os detalhes</span>
+    </article>
   )
 }

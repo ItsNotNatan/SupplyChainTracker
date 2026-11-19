@@ -51,7 +51,7 @@ export default function BotaoUpload({
         <h2>{modo === 'arquivo' ? 'Área de Preparação de Arquivos' : 'Importar Planilha via URL'}</h2>
         <p>
           {modo === 'arquivo'
-            ? 'Arraste ou selecione suas planilhas de Follow-up, Comerciais, PCP, PRPO, etc.'
+            ? 'Arraste ou selecione suas planilhas de Follow-up, Sourcing Plan, PCP e materiais.'
             : 'Cole o link da planilha compartilhada para importar os dados automaticamente.'
           }
         </p>

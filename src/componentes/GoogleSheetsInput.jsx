@@ -63,7 +63,7 @@ export default function GoogleSheetsInput({ onProcessar, onDemo, feedback }) {
         </div>
         <span>
           Cole o <strong>link público</strong> da planilha compartilhada.
-          O sistema detecta as abas por nome automaticamente — <strong>sem precisar de chave de API</strong>.
+          O sistema procura as abas de Follow-up, Sourcing Plan, PCP e materiais — <strong>sem precisar de chave de API</strong>.
         </span>
       </div>
 
