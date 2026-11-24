@@ -1,0 +1,315 @@
+.sct-home-hub-container {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(219, 234, 254, .6), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(224, 231, 255, .55), transparent 30%),
+    #f8fafc;
+}
+
+.sct-wave-container {
+  position: absolute;
+  z-index: -1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: min(48vh, 390px);
+  min-height: 210px;
+  pointer-events: none;
+}
+
+.sct-wave-container svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sct-home-hub-content {
+  width: min(100%, 1120px);
+  margin: auto;
+  padding: clamp(2rem, 5vh, 4rem) clamp(1.1rem, 4vw, 2.5rem) 1.25rem;
+  animation: sct-home-fade-in .55s ease both;
+}
+
+.sct-home-hub-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto clamp(2rem, 5vh, 3.25rem);
+}
+
+.sct-home-hub-logo {
+  display: block;
+  width: auto;
+  max-width: min(210px, 55vw);
+  height: clamp(52px, 8vh, 76px);
+  object-fit: contain;
+  margin-bottom: 1.35rem;
+}
+
+.sct-home-kicker {
+  margin-bottom: .55rem;
+  color: #64748b;
+  font-size: .67rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.sct-home-greeting {
+  color: #0f172a;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: clamp(1.65rem, 4vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: 1.12;
+}
+
+.sct-home-greeting span {
+  color: #087fa7;
+}
+
+.sct-home-instructions {
+  max-width: 650px;
+  margin-top: .85rem;
+  color: #64748b;
+  font-size: clamp(.82rem, 1.6vw, .98rem);
+  line-height: 1.65;
+}
+
+.sct-home-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2.5vw, 1.65rem);
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.sct-hub-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 315px;
+  padding: clamp(1.25rem, 2.5vw, 1.8rem);
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-top: 4px solid #0284c7;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .055);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.sct-hub-card::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 0 0 0 100%;
+  background: rgba(219, 234, 254, .32);
+  content: '';
+  pointer-events: none;
+}
+
+.sct-hub-card--indigo {
+  border-top-color: #6366f1;
+}
+
+.sct-hub-card--indigo::after {
+  background: rgba(224, 231, 255, .43);
+}
+
+.sct-hub-card:hover {
+  transform: translateY(-5px);
+  border-color: #94a3b8;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, .11);
+}
+
+.sct-hub-card:focus-visible {
+  outline: 3px solid rgba(8, 145, 178, .32);
+  outline-offset: 4px;
+}
+
+.sct-hub-card-topline {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .8rem;
+  min-height: 58px;
+  margin-bottom: 1rem;
+}
+
+.sct-hub-card-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  border: 1px solid rgba(2, 132, 199, .14);
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #087fa7;
+}
+
+.sct-hub-card--indigo .sct-hub-card-icon {
+  border-color: rgba(99, 102, 241, .15);
+  background: #eef2ff;
+  color: #5558d9;
+}
+
+.sct-hub-card-status {
+  position: relative;
+  z-index: 1;
+  max-width: 190px;
+  padding: .35rem .58rem;
+  border: 1px solid rgba(8, 145, 178, .2);
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0e7490;
+  font-size: .62rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.sct-hub-card-status--planned {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.sct-hub-card h2 {
+  position: relative;
+  z-index: 1;
+  margin-bottom: .55rem;
+  color: #0f172a;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 1.24rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+.sct-hub-card p {
+  position: relative;
+  z-index: 1;
+  min-height: 3.7rem;
+  color: #64748b;
+  font-size: .82rem;
+  line-height: 1.6;
+}
+
+.sct-area-tags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .42rem;
+  margin-top: 1rem;
+}
+
+.sct-area-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .58rem;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: .62rem;
+  font-weight: 700;
+}
+
+.sct-hub-card--indigo .sct-area-tag {
+  border-color: #e0e7ff;
+  background: #fafaff;
+}
+
+.sct-hub-card-action {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: auto;
+  padding-top: 1.25rem;
+  color: #087fa7;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.sct-hub-card--indigo .sct-hub-card-action {
+  color: #5558d9;
+}
+
+.sct-arrow-transition {
+  flex: 0 0 auto;
+  transition: transform .2s ease;
+}
+
+.sct-hub-card:hover .sct-arrow-transition {
+  transform: translateX(4px);
+}
+
+.sct-home-hub-footer {
+  margin-top: clamp(1.6rem, 4vh, 2.5rem);
+  color: #94a3b8;
+  font-size: .66rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sct-home-hub-footer span {
+  padding: 0 .3rem;
+}
+
+@keyframes sct-home-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 680px) {
+  .sct-home-hub-content {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .sct-home-hub-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .sct-home-hub-grid {
+    grid-template-columns: 1fr;
+    max-width: 470px;
+  }
+
+  .sct-hub-card {
+    min-height: 285px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sct-home-hub-content {
+    animation: none;
+  }
+
+  .sct-hub-card,
+  .sct-arrow-transition {
+    transition: none;
+  }
+}

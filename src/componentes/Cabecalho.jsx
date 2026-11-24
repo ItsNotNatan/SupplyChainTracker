@@ -1,29 +1,17 @@
-import { useState } from 'react'
 import { Home } from 'lucide-react'
+import logoComau from '../assets/logo-comau.png'
 
-export default function Cabecalho({ onHome, showHome = false }) {
-  const [logoUnavailable, setLogoUnavailable] = useState(false)
-
+export default function Cabecalho({ onHome }) {
   return (
     <header className="app-header">
       <div className="header-title-wrapper">
-        {logoUnavailable ? (
-          <span className="header-logo-fallback">COMAU</span>
-        ) : (
-          <img
-            src="/logo-comau.png"
-            alt="COMAU"
-            className="header-logo-img"
-            onError={() => setLogoUnavailable(true)}
-          />
-        )}
+        <img src={logoComau} alt="COMAU" className="header-logo-img" />
         <h1 className="header-title">SUPPLY CHAIN TRACKER</h1>
       </div>
-      {showHome && (
-        <button type="button" className="header-home-button" onClick={onHome}>
-          <Home className="icon-sm" /> Início
-        </button>
-      )}
+      <button type="button" className="header-home-btn" onClick={onHome} aria-label="Voltar à central de operações">
+        <Home size={17} />
+        <span>Central</span>
+      </button>
     </header>
   )
 }
