@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  X, Folder, Hash, PenTool, DollarSign, Wrench, Factory, ChevronDown, ChevronUp, Search
+  X, Folder, Hash, PenTool, DollarSign, Settings, Factory,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search, RotateCcw
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
@@ -9,49 +10,24 @@ const MATERIAL_MILESTONES = [
   { key: 'liberacao', label: 'Liberação' },
   { key: 'insercaoTarefa', label: 'Inserção de tarefa' },
   { key: 'requisicao', label: 'Requisição' },
-  { key: 'pedido', label: 'Pedido' }
+  { key: 'pedido', label: 'Pedido' },
+  { key: 'entregaComau', label: 'Entrega na COMAU' },
+  { key: 'criacaoPS', label: 'Criação do P&S' },
+  { key: 'entregaUsuario', label: 'Entrega ao usuário' }
 ]
 
-const COMPLEMENTARY_MILESTONES = [
-  { key: 'entregaComau', label: 'Data de entrega na COMAU' },
-  { key: 'criacaoPS', label: 'Data da criação do P&S' },
-  { key: 'entregaUsuario', label: 'Data de entrega ao usuário' }
-]
+const PAGE_SIZE_OPTIONS = [3, 6, 9, 12, 24]
 
-// 1. LIMITE DEFINIDO PARA 5 ITENS POR PÁGINA
-const ITENS_POR_PAGINA = 5
-
-function filtrarMateriais(materiais, termoBusca) {
-  if (!termoBusca) return materiais
-  
-  const keyword = String(termoBusca)
+function normalizeFilter(value) {
+  return String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-
-  return materiais.filter(item => {
-    const textoItem = [
-      item.descricao, item.referencia, item.fabricante, 
-      item.fornecedor, item.rc, item.po, item.tag
-    ].filter(Boolean).join(' ')
-     .normalize('NFD')
-     .replace(/[\u0300-\u036f]/g, '')
-     .toLowerCase()
-
-    return textoItem.includes(keyword)
-  })
 }
 
-export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
-  const [activeTab, setActiveTab] = useState(initialTab)
-  const [activeEngineeringSub, setActiveEngineeringSub] = useState('All')
-  
-  const [buscaComerciais, setBuscaComerciais] = useState('')
-  const [buscaConstrutivos, setBuscaConstrutivos] = useState('')
-
-  const [paginaComerciais, setPaginaComerciais] = useState(1)
-  const [paginaConstrutivos, setPaginaConstrutivos] = useState(1)
+export default function ModalDetalhes({ card, onClose }) {
+  const [activeTab, setActiveTab] = useState('All')
 
   useEffect(() => {
     const handleKeyDown = event => {
@@ -61,20 +37,7 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  useEffect(() => {
-    setActiveTab(initialTab)
-    setActiveEngineeringSub('All')
-    
-    setBuscaComerciais('')
-    setBuscaConstrutivos('')
-    setPaginaComerciais(1)
-    setPaginaConstrutivos(1)
-  }, [card?.id, initialTab])
-
-  function handleTabChange(tab) {
-    setActiveTab(tab)
-    setActiveEngineeringSub('All')
-  }
+  useEffect(() => setActiveTab('All'), [card?.id])
 
   if (!card) return null
 
@@ -83,22 +46,9 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
   const showCommercial = showAll || activeTab === 'Comerciais'
   const showConstructive = showAll || activeTab === 'Construtivos'
   const showManufacturing = showAll || activeTab === 'Manufatura'
-  
   const materials = card.materiais ?? { comerciais: [], construtivos: [] }
-  
-  // 2. MATEMÁTICA DA PAGINAÇÃO PARA COMERCIAIS
-  const comerciaisFiltrados = filtrarMateriais(materials.comerciais, buscaComerciais)
-  const totalPaginasComerciais = Math.ceil(comerciaisFiltrados.length / ITENS_POR_PAGINA)
-  const indiceInicioComerciais = (paginaComerciais - 1) * ITENS_POR_PAGINA
-  const indiceFimComerciais = paginaComerciais * ITENS_POR_PAGINA
-  const comerciaisVisiveis = comerciaisFiltrados.slice(indiceInicioComerciais, indiceFimComerciais)
-
-  // 3. MATEMÁTICA DA PAGINAÇÃO PARA CONSTRUTIVOS
-  const construtivosFiltrados = filtrarMateriais(materials.construtivos, buscaConstrutivos)
-  const totalPaginasConstrutivos = Math.ceil(construtivosFiltrados.length / ITENS_POR_PAGINA)
-  const indiceInicioConstrutivos = (paginaConstrutivos - 1) * ITENS_POR_PAGINA
-  const indiceFimConstrutivos = paginaConstrutivos * ITENS_POR_PAGINA
-  const construtivosVisiveis = construtivosFiltrados.slice(indiceInicioConstrutivos, indiceFimConstrutivos)
+  const commercialItems = materials.comerciais ?? []
+  const constructiveItems = materials.construtivos ?? []
 
   return (
     <div className="modal-overlay active" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
@@ -120,37 +70,29 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
         </div>
 
         <div className="modal-body">
-          <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={handleTabChange} />
+          <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={setActiveTab} />
+
+          <MaterialCategorySelector
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+            commercialCount={commercialItems.length}
+            constructiveCount={constructiveItems.length}
+          />
 
           <div className="details-grid">
             {showEngineering && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={PenTool} title="Engenharia" status={card.stages?.Engenharia} />
                 <div className="engineering-subgrid">
-                  <EngineeringSubsection
-                    id="mecanica"
-                    title="Mec"
-                    status={card.subStages?.EngMecanica}
-                    expanded={activeEngineeringSub === 'All' || activeEngineeringSub === 'Mec'}
-                    selected={activeEngineeringSub === 'Mec'}
-                    onClick={() => setActiveEngineeringSub(current => current === 'Mec' ? 'All' : 'Mec')}
-                  >
+                  <EngineeringSubsection title="Mecânica" status={card.subStages?.EngMecanica}>
                     <InfoRow label="Desenho 3D" value={card.construtivo?.des3D || 'Não mapeado'} badge />
                     <InfoRow label="Desenho 2D" value={card.construtivo?.des2D || 'Não mapeado'} badge />
                     <InfoRow label="Lista de materiais mecânicos" value={card.pcp?.listaMatMec && card.pcp.listaMatMec !== 'Não mapeado' ? card.pcp.listaMatMec : (card.construtivo?.listaMatMec || 'Não mapeado')} badge />
-                    <InfoRow label="Revisão" value={card.construtivo?.rev || '—'} />
                   </EngineeringSubsection>
 
-                  <EngineeringSubsection
-                    id="controls"
-                    title="Controles"
-                    status={card.subStages?.EngControls}
-                    expanded={activeEngineeringSub === 'All' || activeEngineeringSub === 'Controls'}
-                    selected={activeEngineeringSub === 'Controls'}
-                    onClick={() => setActiveEngineeringSub(current => current === 'Controls' ? 'All' : 'Controls')}
-                  >
+                  <EngineeringSubsection title="Controls" status={card.subStages?.EngControls}>
                     <InfoRow label="Projeto elétrico" value={card.pcp?.projEle || 'Não mapeado'} badge />
-                    <InfoRow label="Lista de materiais de controles" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
+                    <InfoRow label="Lista de materiais de control" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
                     <InfoRow label="Topográfico" value={card.pcp?.projTop || 'Não mapeado'} badge />
                     <InfoRow label="Lista de identificações" value={card.pcp?.listaIdent || 'Não mapeado'} badge />
                     <InfoRow label="Layout de calha" value={card.pcp?.layoutCalha || 'Não mapeado'} badge />
@@ -160,93 +102,26 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
             )}
 
             {showCommercial && (
-              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
+              <section className={`detail-section material-detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={DollarSign} title="Comerciais" status={card.stages?.Comerciais} />
-                
-                <div className="keyword-filter" style={{ marginBottom: '1rem', width: '100%' }}>
-                  <Search className="filter-search-icon icon-sm" />
-                  <input
-                    type="text"
-                    placeholder="Procurar por palavra chave..."
-                    className="filter-input"
-                    value={buscaComerciais}
-                    onChange={e => {
-                      setBuscaComerciais(e.target.value)
-                      setPaginaComerciais(1)
-                    }}
-                  />
-                </div>
-
-                <CaixaExpansivel 
-                  titulo="Itens Comerciais" 
-                  contagem={comerciaisFiltrados.length}
-                >
-                  {comerciaisVisiveis.length > 0 ? (
-                    <>
-                      <div className="material-list">
-                        {comerciaisVisiveis.map((item, index) => (
-                          <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="commercial" />
-                        ))}
-                      </div>
-                      
-                      {/* INSERÇÃO DOS BOTÕES DE PAGINAÇÃO */}
-                      <ControlesPaginacao 
-                        paginaAtual={paginaComerciais} 
-                        totalPaginas={totalPaginasComerciais} 
-                        onMudarPagina={setPaginaComerciais} 
-                      />
-                    </>
-                  ) : (
-                    <EmptyMessage>Nenhum item comercial encontrado para esta pesquisa.</EmptyMessage>
-                  )}
-                </CaixaExpansivel>
+                {commercialItems.length > 0 ? (
+                  <MaterialListExplorer items={commercialItems} category="commercial" />
+                ) : (
+                  <EmptyMessage>Nenhum item comercial associado a esta transmissão.</EmptyMessage>
+                )}
               </section>
             )}
 
             {showConstructive && (
-              <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
-                <SectionTitle icon={Wrench} title="Construtivos" status={card.stages?.Construtivos} />
-                
-                <div className="keyword-filter" style={{ marginBottom: '1rem', width: '100%' }}>
-                  <Search className="filter-search-icon icon-sm" />
-                  <input
-                    type="text"
-                    placeholder="Procurar por palavra chave..."
-                    className="filter-input"
-                    value={buscaConstrutivos}
-                    onChange={e => {
-                      setBuscaConstrutivos(e.target.value)
-                      setPaginaConstrutivos(1)
-                    }}
-                  />
-                </div>
-
-                <CaixaExpansivel 
-                  titulo="Itens Construtivos" 
-                  contagem={construtivosFiltrados.length}
-                >
-                  {construtivosVisiveis.length > 0 ? (
-                    <>
-                      <div className="material-list">
-                        {construtivosVisiveis.map((item, index) => (
-                          <MaterialCard key={item.id || `${item.referencia}-${index}`} item={item} category="constructive" />
-                        ))}
-                      </div>
-
-                      {/* INSERÇÃO DOS BOTÕES DE PAGINAÇÃO */}
-                      <ControlesPaginacao 
-                        paginaAtual={paginaConstrutivos} 
-                        totalPaginas={totalPaginasConstrutivos} 
-                        onMudarPagina={setPaginaConstrutivos} 
-                      />
-                    </>
-                  ) : (
-                    <EmptyMessage>Nenhum item construtivo encontrado para esta pesquisa.</EmptyMessage>
-                  )}
-                </CaixaExpansivel>
-                
+              <section className={`detail-section material-detail-section ${!showAll ? 'full-width' : ''}`}>
+                <SectionTitle icon={Settings} title="Construtivos" status={card.stages?.Construtivos} />
+                {constructiveItems.length > 0 ? (
+                  <MaterialListExplorer items={constructiveItems} category="constructive" />
+                ) : (
+                  <EmptyMessage>Nenhum item construtivo associado a esta transmissão.</EmptyMessage>
+                )}
                 {card.construtivo?.obs && (
-                  <div className="material-observation" style={{ marginTop: '1rem' }}>
+                  <div className="material-observation">
                     <strong>Observações do follow-up:</strong> {card.construtivo.obs}
                   </div>
                 )}
@@ -260,16 +135,12 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
                   <InfoRow label="Estratégia" value={card.manufatura?.estrategia || 'Não mapeado'} />
                   <InfoRow label="Montagem mecânica" value={card.manufatura?.montagemMecanica || 'Não mapeado'} />
                   <InfoRow label="Medição 3D" value={card.manufatura?.medicao3D || 'Não mapeado'} />
-                  <InfoRow label="Bordo-máquina" value={card.manufatura?.bordoMaquina || 'Não mapeado'} />
+                  <InfoRow label="Bordo-máquina" value={card.manufatura?.bordoMaquina || (card.pcp ? 'Registrado no PCP' : 'Não mapeado')} />
                   <InfoRow label="Inspeção da qualidade" value={card.manufatura?.inspecaoQualidade || card.pcp?.testes || 'Não mapeado'} />
-                  <InfoRow label="Controle de processo" value={card.pcp?.controleProcesso || 'Não mapeado'} />
                   {card.construtivo?.localEnt && card.construtivo.localEnt !== '-' && (
                     <InfoRow label="Local de montagem" value={card.construtivo.localEnt} />
                   )}
                 </div>
-                {card.pcp?.semanaEntrega && (
-                  <p className="date-table-note manufacturing-week-note">Semana informada no PCP: <strong>{card.pcp.semanaEntrega}</strong>. A conversão para uma data depende do calendário/ano da planilha de origem.</p>
-                )}
                 <DateTable
                   title="Entrega do dispositivo"
                   dates={{ entregaDispositivo: card.manufatura?.entregaDispositivo || card.pcp?.entregaDispositivo }}
@@ -284,93 +155,66 @@ export default function ModalDetalhes({ card, onClose, initialTab = 'All' }) {
   )
 }
 
-// ==========================================
-// COMPONENTES AUXILIARES
-// ==========================================
-
-// 4. NOVO COMPONENTE DE PAGINAÇÃO: Renderiza os números das páginas e botões Anterior/Próximo
-function ControlesPaginacao({ paginaAtual, totalPaginas, onMudarPagina }) {
-  if (totalPaginas <= 1) return null
-
-  const botoesPagina = []
-  for (let i = 1; i <= totalPaginas; i++) {
-    const isAtiva = paginaAtual === i
-    botoesPagina.push(
-      <button
-        key={i}
-        onClick={() => onMudarPagina(i)}
-        style={{
-          margin: '0 0.2rem',
-          padding: '0.35rem 0.65rem',
-          border: '1px solid',
-          borderColor: isAtiva ? 'var(--cyan-mid)' : 'var(--border-mid)',
-          background: isAtiva ? 'var(--cyan-mid)' : 'var(--surface)',
-          color: isAtiva ? '#fff' : 'var(--text-main)',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: '0.75rem',
-          transition: 'all 0.2s'
-        }}
-        aria-label={`Página ${i}`}
-        aria-current={isAtiva ? 'page' : undefined}
-      >
-        {i}
-      </button>
-    )
-  }
+function MaterialCategorySelector({
+  activeTab,
+  onSelect,
+  commercialCount,
+  constructiveCount
+}) {
+  const categories = [
+    {
+      key: 'Comerciais',
+      title: 'Comerciais',
+      description: 'Visualizar somente os materiais comerciais desta transmissão',
+      count: commercialCount,
+      icon: DollarSign,
+      className: 'commercial'
+    },
+    {
+      key: 'Construtivos',
+      title: 'Construtivos',
+      description: 'Visualizar somente os materiais construtivos desta transmissão',
+      count: constructiveCount,
+      icon: Settings,
+      className: 'constructive'
+    }
+  ]
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem', gap: '0.5rem' }}>
-      <button
-        disabled={paginaAtual === 1}
-        onClick={() => onMudarPagina(paginaAtual - 1)}
-        className="btn-outline"
-        style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: paginaAtual === 1 ? 0.5 : 1 }}
-      >
-        Anterior
-      </button>
-      
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {botoesPagina}
+    <section className="material-category-area" aria-label="Selecionar classe de materiais">
+      <div className="material-category-heading">
+        <h3>Materiais da transmissão</h3>
+        <p>Selecione uma das caixas para visualizar os itens daquela classe.</p>
       </div>
-      
-      <button
-        disabled={paginaAtual === totalPaginas}
-        onClick={() => onMudarPagina(paginaAtual + 1)}
-        className="btn-outline"
-        style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: paginaAtual === totalPaginas ? 0.5 : 1 }}
-      >
-        Próximo
-      </button>
-    </div>
-  )
-}
 
-function CaixaExpansivel({ titulo, contagem, children }) {
-  const [aberto, setAberto] = useState(false)
+      <div className="material-category-selector">
+        {categories.map(({ key, title, description, count, icon: Icon, className }) => (
+          <button
+            key={key}
+            type="button"
+            className={`material-category-button ${className} ${activeTab === key ? 'selected' : ''}`}
+            onClick={() => onSelect(key)}
+            aria-pressed={activeTab === key}
+          >
+            <span className="material-category-icon"><Icon className="icon-lg" /></span>
+            <span className="material-category-copy">
+              <strong>{title}</strong>
+              <small>{description}</small>
+            </span>
+            <span className="material-category-count">
+              <strong>{count}</strong>
+              <small>{count === 1 ? 'item' : 'itens'}</small>
+            </span>
+          </button>
+        ))}
+      </div>
 
-  return (
-    <div style={{ border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '0.5rem', background: 'var(--surface)' }}>
-      <button 
-        onClick={() => setAberto(!aberto)}
-        style={{ 
-          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-          padding: '0.75rem 1rem', background: 'var(--surface-2)', border: 'none', 
-          cursor: 'pointer', borderBottom: aberto ? '1px solid var(--border)' : 'none',
-          fontFamily: 'inherit', color: 'var(--text-main)', fontWeight: 600
-        }}
-      >
-        <span>{titulo} <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>({contagem} itens)</span></span>
-        {aberto ? <ChevronUp className="icon-sm text-muted" /> : <ChevronDown className="icon-sm text-muted" />}
-      </button>
-      
-      {aberto && (
-        <div style={{ padding: '1rem', background: 'var(--bg)' }}>
-          {children}
-        </div>
-      )}
-    </div>
+      {activeTab === 'Comerciais' || activeTab === 'Construtivos' ? (
+        <button type="button" className="material-category-show-all" onClick={() => onSelect('All')}>
+          Mostrar todas as etapas novamente
+        </button>
+      ) : null}
+    </section>
   )
 }
 
@@ -388,96 +232,203 @@ function SectionTitle({ icon: Icon, title, status }) {
   )
 }
 
-function EngineeringSubsection({ id, title, status, expanded, selected, onClick, children }) {
+function EngineeringSubsection({ title, status, children }) {
   const theme = getTheme(status)
   const StatusIcon = theme.Icon
   return (
-    <section className={`engineering-subsection ${selected ? 'selected' : ''}`}>
-      <button
-        type="button"
-        className="engineering-subsection-toggle"
-        onClick={onClick}
-        aria-expanded={expanded}
-        aria-controls={`engineering-subsection-${id}`}
-        aria-pressed={selected}
-      >
+    <div className="engineering-subsection">
+      <div className="engineering-subsection-title">
         <span>{title}</span>
-        <span className="engineering-subsection-toggle-status" title={`Status: ${theme.t}`} aria-label={`Status: ${theme.t}`}>
-          <StatusIcon className={`icon-sm ${theme.c}`} />
-        </span>
-      </button>
-      {expanded && <div id={`engineering-subsection-${id}`} className="engineering-subsection-content">{children}</div>}
-    </section>
+        <StatusIcon className={`icon-sm ${theme.c}`} title={`Status: ${theme.t}`} />
+      </div>
+      {children}
+    </div>
   )
 }
 
-// Substitui apenas a função MaterialCard no ficheiro ModalDetalhes.jsx
+function MaterialListExplorer({ items, category }) {
+  const [manufacturerFilter, setManufacturerFilter] = useState('')
+  const [rcFilter, setRcFilter] = useState('')
+  const [poFilter, setPoFilter] = useState('')
+  const [pageSize, setPageSize] = useState(9)
+  const [page, setPage] = useState(1)
+
+  const manufacturerOptions = useMemo(() => (
+    Array.from(new Set(items
+      .map(item => String(item.fabricante || item.fornecedor || '').trim())
+      .filter(name => name && !['-', 'nao informado', 'n/a'].includes(normalizeFilter(name)))))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  ), [items])
+
+  const filteredItems = useMemo(() => items.filter(item => {
+    const itemManufacturer = normalizeFilter(item.fabricante || item.fornecedor)
+    const itemRc = normalizeFilter(item.rc)
+    const itemPo = normalizeFilter(item.po)
+    return (!manufacturerFilter || itemManufacturer === normalizeFilter(manufacturerFilter)) &&
+      (!rcFilter || itemRc.includes(normalizeFilter(rcFilter))) &&
+      (!poFilter || itemPo.includes(normalizeFilter(poFilter)))
+  }), [items, manufacturerFilter, rcFilter, poFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const startIndex = (safePage - 1) * pageSize
+  const visibleItems = filteredItems.slice(startIndex, startIndex + pageSize)
+  const firstVisible = filteredItems.length ? startIndex + 1 : 0
+  const lastVisible = Math.min(startIndex + pageSize, filteredItems.length)
+
+  useEffect(() => {
+    setPage(1)
+  }, [manufacturerFilter, rcFilter, poFilter, pageSize, items])
+
+  const hasFilters = Boolean(manufacturerFilter || rcFilter || poFilter)
+  const pageStart = Math.max(1, Math.min(safePage - 2, totalPages - 4))
+  const pageEnd = Math.min(totalPages, pageStart + 4)
+  const pageNumbers = Array.from({ length: pageEnd - pageStart + 1 }, (_, index) => pageStart + index)
+
+  return (
+    <div className="material-list-browser">
+      <div className="material-filter-panel" aria-label="Filtros dos materiais">
+        <div className="material-filter-heading">
+          <div>
+            <strong>Filtrar materiais</strong>
+            <span>Fabricante, número da RC e número da PO</span>
+          </div>
+          {hasFilters && (
+            <button
+              type="button"
+              className="material-filter-reset"
+              onClick={() => {
+                setManufacturerFilter('')
+                setRcFilter('')
+                setPoFilter('')
+              }}
+            >
+              <RotateCcw size={13} /> Limpar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="material-filters-grid">
+          <label className="material-filter-field">
+            <span>{category === 'commercial' ? 'Fabricante' : 'Construtivos'}</span>
+            <select value={manufacturerFilter} onChange={event => setManufacturerFilter(event.target.value)}>
+              <option value="">Todos</option>
+              {manufacturerOptions.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
+
+          <label className="material-filter-field">
+            <span>Nº da RC</span>
+            <div className="material-filter-input-wrap">
+              <Search size={14} />
+              <input
+                type="search"
+                placeholder="Buscar RC"
+                value={rcFilter}
+                onChange={event => setRcFilter(event.target.value)}
+              />
+            </div>
+          </label>
+
+          <label className="material-filter-field">
+            <span>Nº da PO</span>
+            <div className="material-filter-input-wrap">
+              <Search size={14} />
+              <input
+                type="search"
+                placeholder="Buscar PO"
+                value={poFilter}
+                onChange={event => setPoFilter(event.target.value)}
+              />
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="material-list-summary">
+        <span>{filteredItems.length} {filteredItems.length === 1 ? 'material encontrado' : 'materiais encontrados'}</span>
+        <label>
+          Itens por página
+          <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>
+            {PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {visibleItems.length > 0 ? (
+        <div className="material-list">
+          {visibleItems.map((item, index) => (
+            <MaterialCard key={item.id || `${item.referencia}-${startIndex + index}`} item={item} category={category} />
+          ))}
+        </div>
+      ) : (
+        <EmptyMessage>
+          {items.length === 0
+            ? 'Nenhum material cadastrado nesta categoria.'
+            : 'Nenhum material corresponde aos filtros selecionados.'}
+        </EmptyMessage>
+      )}
+
+      {filteredItems.length > 0 && totalPages > 1 && (
+        <nav className="material-pagination" aria-label="Paginação dos materiais">
+          <span className="material-pagination-range">Exibindo {firstVisible}–{lastVisible} de {filteredItems.length}</span>
+          <div className="material-pagination-buttons">
+            <button type="button" onClick={() => setPage(1)} disabled={safePage === 1} aria-label="Primeira página" title="Primeira página">
+              <ChevronsLeft size={15} />
+            </button>
+            <button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={safePage === 1} aria-label="Página anterior" title="Página anterior">
+              <ChevronLeft size={15} />
+            </button>
+            {pageNumbers.map(pageNumber => (
+              <button
+                type="button"
+                key={pageNumber}
+                className={safePage === pageNumber ? 'active' : ''}
+                onClick={() => setPage(pageNumber)}
+                aria-current={safePage === pageNumber ? 'page' : undefined}
+              >
+                {pageNumber}
+              </button>
+            ))}
+            <button type="button" onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={safePage === totalPages} aria-label="Próxima página" title="Próxima página">
+              <ChevronRight size={15} />
+            </button>
+            <button type="button" onClick={() => setPage(totalPages)} disabled={safePage === totalPages} aria-label="Última página" title="Última página">
+              <ChevronsRight size={15} />
+            </button>
+          </div>
+        </nav>
+      )}
+    </div>
+  )
+}
 
 function MaterialCard({ item, category }) {
   const isCommercial = category === 'commercial'
-  const manufacturerLabel = isCommercial ? 'Fabricante' : 'Fornecedor'
-  const manufacturerValue = isCommercial
-    ? item.fabricante
-    : (item.fornecedores?.length ? item.fornecedores.join(', ') : (item.fornecedor || item.fabricante))
-
-  // LÓGICA DE CORES: Define a classe base e adiciona o verde se for antecipado
-  let cardClass = isCommercial ? 'material-commercial' : 'material-constructive'
-  if (item.tag) {
-    cardClass += ' material-anticipated'
-  }
+  const manufacturerLabel = isCommercial ? 'Fabricante' : 'Construtivos'
+  const manufacturerValue = isCommercial ? item.fabricante : (item.fornecedor || item.fabricante)
+  const combinedDates = { ...(item.datas || {}), ...(item.datasComplementares || {}) }
 
   return (
-    <article className={`material-card ${cardClass}`}>
+    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'}`}>
       <div className="material-card-heading">
         <div>
           <div className="material-type-label">{isCommercial ? 'Material comercial' : 'Material construtivo'}</div>
           <h4 className="material-description">{item.descricao || 'Descrição não informada'}</h4>
         </div>
-        {/* A etiqueta verde no canto superior direito mantém-se */}
         {item.tag && <span className="anticipation-tag">{item.tag}</span>}
       </div>
 
       <div className="material-fields">
-        <InfoRow label="Qtd" value={item.qtd || '—'} />
         <InfoRow label="Referência" value={item.referencia || '—'} />
         <InfoRow label={manufacturerLabel} value={manufacturerValue || 'Não informado'} />
+        <InfoRow label="Qtd" value={item.qtd || '—'} />
         <InfoRow label="Status da liberação" value={item.statusLiberacao || 'Não informado'} badge />
-        {(isCommercial || (item.fornecedoresDetalhes?.length ?? 0) <= 1) && (
-          <>
-            <InfoRow label="Nº da RC" value={item.rc || 'Não informado'} />
-            <InfoRow label="Nº da PO" value={item.po || 'Não informado'} />
-          </>
-        )}
+        <InfoRow label="Nº da RC" value={item.rc || 'Não informado'} />
+        <InfoRow label="Nº da PO" value={item.po || 'Não informado'} />
       </div>
 
-      {!isCommercial && (item.fornecedoresDetalhes?.length ?? 0) > 1 && (
-        <div className="date-table-block compact">
-          <div className="date-table-heading">Acompanhamento por fornecedor</div>
-          <div className="date-table-scroll">
-            <table className="date-table">
-              <thead><tr><th>Fornecedor</th><th>Nº da RC</th><th>Nº da PO</th><th>Status da liberação</th></tr></thead>
-              <tbody>{item.fornecedoresDetalhes.map((supplier, index) => (
-                <tr key={`${supplier.nome}-${index}`}>
-                  <th scope="row">{supplier.nome}</th>
-                  <td>{supplier.rc || 'Não informado'}</td>
-                  <td>{supplier.po || 'Não informado'}</td>
-                  <td>{supplier.statusLiberacao || 'Não informado'}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <DateTable title="Datas de acompanhamento" dates={item.datas} milestones={MATERIAL_MILESTONES} />
-      <SingleDateTable title="Dados de outras planilhas" dates={item.datasComplementares} milestones={COMPLEMENTARY_MILESTONES} />
-
-      {(item.nf || item.pull) && (
-        <div className="material-extra-info">
-          {item.nf && <span>NF: {item.nf}</span>}
-          {item.pull && <span>PULL: {item.pull}</span>}
-        </div>
-      )}
+      <DateTable title="Cronograma de acompanhamento" dates={combinedDates} milestones={MATERIAL_MILESTONES} />
     </article>
   )
 }
@@ -518,36 +469,6 @@ function DateTable({ title, dates = {}, milestones, compact = false }) {
         </table>
       </div>
       {!hasAnyDate && <p className="date-table-note">Datas ainda não disponíveis na base importada.</p>}
-    </div>
-  )
-}
-
-function SingleDateTable({ title, dates = {}, milestones }) {
-  if (!milestones?.length) return null
-  const hasAnyDate = milestones.some(({ key }) => dates?.[key])
-
-  return (
-    <div className="date-table-block compact">
-      <div className="date-table-heading">{title}</div>
-      <div className="date-table-scroll">
-        <table className="date-table">
-          <thead>
-            <tr>
-              <th>Informação</th>
-              <th>Data</th>
-            </tr>
-          </thead>
-          <tbody>
-            {milestones.map(({ key, label }) => (
-              <tr key={key}>
-                <th scope="row">{label}</th>
-                <td>{formatDate(dates?.[key])}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!hasAnyDate && <p className="date-table-note">Dados ainda não disponíveis nas planilhas de origem.</p>}
     </div>
   )
 }

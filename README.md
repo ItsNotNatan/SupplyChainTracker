@@ -134,16 +134,11 @@ flowchart LR
 ---
 
 
-## Navegação e importação das classes de acompanhamento
-
-A tela inicial oferece dois acessos: **Supply Chain**, para consultar as transmissões, e **Banco de dados**, para importar e preparar as planilhas. Nesta versão, os dados processados ficam na memória da sessão do navegador; o compartilhamento persistente entre usuários depende de backend e conexão com PostgreSQL.
-
-O fluxo de Manufatura também reconhece a aba/arquivo `PCP Manufacturing`. Quando os cabeçalhos não estiverem disponíveis, usa a coluna L para a transmissão e a coluna AP para preservar a semana/data informada pelo PCP. Valores `WK-xx` são mantidos como semana textual até que a planilha forneça calendário e ano suficientes para uma conversão segura.
-
+## Importação das classes de acompanhamento
 
 O rastreador organiza cada transmissão em **Engenharia**, **Comerciais**, **Construtivos** e **Manufatura**. Para a classe de materiais, a importação reconhece uma aba ou arquivo chamado `Sourcing Plan` (também aceita variações simples do nome). O classificador de materiais procura a coluna de tipo/classe; quando ela não é identificada pelo cabeçalho, usa a coluna B. O ID da transmissão é procurado pelo cabeçalho e, como alternativa, pela coluna M.
 
-No `Sourcing Plan`, os cabeçalhos são identificados por nomes em português ou inglês para quantidade, descrição, referência, fabricante/fornecedor, status de liberação, RC e PO. Para datas, o sistema procura grupos **Plan / Prev / Real** (Planejado / Previsto / Realizado) nos marcos de liberação, inserção de tarefa, requisição e pedido. As datas complementares — entrega na COMAU, criação do P&S e entrega ao usuário — usam campos de data simples; a associação com outras planilhas permanece preparada, mas depende da definição dos arquivos, abas e chaves de relacionamento.
+No `Sourcing Plan`, os cabeçalhos são identificados por nomes em português ou inglês para quantidade, descrição, referência, fabricante/fornecedor, status de liberação, RC e PO. Para datas, o sistema procura grupos **Plan / Prev / Real** (Planeado / Previsto / Realizado) nos marcos de liberação, inserção de tarefa, requisição e pedido. As datas complementares — entrega na COMAU, criação do P&S e entrega ao usuário — usam campos de data simples; a associação com outras planilhas permanece preparada, mas depende da definição dos arquivos, abas e chaves de relacionamento.
 
 Os campos sem correspondência na planilha recebida permanecem sem informação; o sistema não cria RC, PO ou datas fictícias. A estrutura está preparada para essas três datas complementares, mas a vinculação com outras planilhas depende de os respectivos arquivos/abas e cabeçalhos serem disponibilizados.
 

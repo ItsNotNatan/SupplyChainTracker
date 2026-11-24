@@ -32,14 +32,13 @@ const TAB_VARIANTS = {
   followUp: ['Follow Up', 'Follow-Up', 'FOLLOW UP', 'follow up', 'FollowUp', 'Follow_Up'],
   saturacao: ['Saturação', 'Saturacao', 'SATURAÇÃO', 'saturacao', 'Saturacão'],
   bordomaquina: ['BordoMaquina', 'Bordo Maquina', 'Bordo', 'bordo', 'BORDOMAQUINA', 'Bordo de Máquina'],
-  pcpManufacturing: ['PCP Manufacturing', 'PCP_MANUFACTURING', 'PCP - Manufacturing', 'PCP', 'Manufacturing', 'Manufatura'],
   sourcingPlan: ['Sourcing Plan', 'SOURCING PLAN', 'sourcing plan', 'SourcingPlan', 'Sourcing_Plan', 'Sourcing-Plan'],
   comerciais: ['Comerciais', 'COMERCIAIS', 'comerciais', 'PoProgr', 'PoProg', 'POPROG'],
   prpo: ['PRPO', 'prpo', 'PR/PO', 'PR-PO']
 }
 
 async function fetchSheetsFromId(sheetId, onProgress) {
-  const result = { followUp: [], saturacao: [], bordomaquina: [], pcpManufacturing: [], sourcingPlans: [], comerciais: [], prpo: [] }
+  const result = { followUp: [], saturacao: [], bordomaquina: [], sourcingPlans: [], comerciais: [], prpo: [] }
   const found = {}
 
   for (const [type, variants] of Object.entries(TAB_VARIANTS)) {
@@ -60,7 +59,7 @@ async function fetchSheetsFromId(sheetId, onProgress) {
 }
 
 export async function fetchAllSheets(urls, onProgress) {
-  const accumulated = { followUp: [], saturacao: [], bordomaquina: [], pcpManufacturing: [], sourcingPlans: [], comerciais: [], prpo: [] }
+  const accumulated = { followUp: [], saturacao: [], bordomaquina: [], sourcingPlans: [], comerciais: [], prpo: [] }
   const summary = []
 
   for (const url of urls) {
@@ -76,7 +75,6 @@ export async function fetchAllSheets(urls, onProgress) {
     if (sheets.followUp.length) accumulated.followUp = accumulated.followUp.length ? [...accumulated.followUp, ...sheets.followUp] : sheets.followUp
     if (sheets.saturacao.length) accumulated.saturacao = accumulated.saturacao.length ? [...accumulated.saturacao, ...sheets.saturacao] : sheets.saturacao
     if (sheets.bordomaquina.length) accumulated.bordomaquina = accumulated.bordomaquina.length ? [...accumulated.bordomaquina, ...sheets.bordomaquina] : sheets.bordomaquina
-    if (sheets.pcpManufacturing.length) accumulated.pcpManufacturing = accumulated.pcpManufacturing.length ? [...accumulated.pcpManufacturing, ...sheets.pcpManufacturing] : sheets.pcpManufacturing
     if (sheets.sourcingPlans.length) accumulated.sourcingPlans.push(...sheets.sourcingPlans)
     if (sheets.comerciais.length) accumulated.comerciais.push(...sheets.comerciais)
     if (sheets.prpo.length) accumulated.prpo = accumulated.prpo.length ? [...accumulated.prpo, ...sheets.prpo] : sheets.prpo

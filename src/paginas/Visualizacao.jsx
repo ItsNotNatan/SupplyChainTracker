@@ -5,13 +5,6 @@ import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
 
 const PAGE_SIZE = 48
 
-function getTransmissionStatus(card) {
-  const statuses = Object.values(card.stages ?? {}).filter(status => status && status !== 'Vazio')
-  if (statuses.length === 0) return 'Vazio'
-  if (statuses.includes('On delayed')) return 'On delayed'
-  return statuses.every(status => status === 'Complete') ? 'Complete' : 'Ongoing'
-}
-
 function normalizeSearch(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -20,11 +13,41 @@ function normalizeSearch(value) {
     .trim()
 }
 
+function flattenSearchValues(value) {
+  if (value === null || value === undefined || value === '') return []
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return []
+    return [value.toLocaleDateString('pt-BR'), value.toISOString().slice(0, 10)]
+  }
+  if (Array.isArray(value)) return value.flatMap(flattenSearchValues)
+  if (typeof value === 'object') return Object.values(value).flatMap(flattenSearchValues)
+  return [String(value)]
+}
+
 function getSearchText(card) {
-  const materialValues = [
+  const materials = [
     ...(card.materiais?.comerciais ?? []),
     ...(card.materiais?.construtivos ?? [])
-  ].flatMap(item => [item.descricao, item.referencia, item.fabricante, item.fornecedor, item.rc, item.po, item.tag])
+  ]
+  const materialValues = materials.flatMap(item => [
+    item.qtd,
+    item.descricao,
+    item.referencia,
+    item.fabricante,
+    item.fornecedor,
+    item.statusLiberacao,
+    item.rc,
+    item.po,
+    item.tag,
+    ...flattenSearchValues(item.datas),
+    ...flattenSearchValues(item.datasComplementares)
+  ])
+
+  const otherDataValues = [
+    ...flattenSearchValues(card.construtivo),
+    ...flattenSearchValues(card.pcp),
+    ...flattenSearchValues(card.manufatura)
+  ]
 
   return normalizeSearch([
     card.id,
@@ -34,8 +57,7 @@ function getSearchText(card) {
     card.linha,
     card.operacao,
     card.descricao,
-    card.construtivo?.fornecedor,
-    card.manufatura?.estrategia,
+    ...otherDataValues,
     ...materialValues
   ].filter(Boolean).join(' '))
 }
@@ -49,19 +71,9 @@ export default function Visualizacao({
   uniqueOperacoes,
   selectedCard,
   onSelectCard,
-  onCloseModal,
-  onOpenDatabase
+  onCloseModal
 }) {
   const [page, setPage] = useState(1)
-  
-  // NOVO ESTADO: Guarda em que aba o modal deve iniciar
-  const [initialTab, setInitialTab] = useState('All')
-
-  // NOVA FUNÇÃO: Intercepta o clique do cartão para guardar a aba antes de abrir
-  const handleCardClick = (card, tab = 'All') => {
-    setInitialTab(tab)
-    onSelectCard(card)
-  }
 
   const filtered = useMemo(() => {
     const keyword = normalizeSearch(filters.palavraChave)
@@ -77,16 +89,6 @@ export default function Visualizacao({
   useEffect(() => { setPage(1) }, [filtered])
 
   const visible = useMemo(() => filtered.slice(0, page * PAGE_SIZE), [filtered, page])
-  const summary = useMemo(() => {
-    const counts = { total: filtered.length, ongoing: 0, delayed: 0, complete: 0 }
-    filtered.forEach(card => {
-      const status = getTransmissionStatus(card)
-      if (status === 'Ongoing') counts.ongoing += 1
-      if (status === 'On delayed') counts.delayed += 1
-      if (status === 'Complete') counts.complete += 1
-    })
-    return counts
-  }, [filtered])
   const hasMore = filtered.length > visible.length
   const remaining = filtered.length - visible.length
 
@@ -143,13 +145,6 @@ export default function Visualizacao({
           </select>
         </div>
 
-        <div className="stats-grid" aria-label="Resumo das transmissões filtradas">
-          <div className="stat-card blue"><div className="stat-title">Total de transmissões</div><div className="stat-value">{summary.total}</div></div>
-          <div className="stat-card yellow"><div className="stat-title">Em andamento</div><div className="stat-value">{summary.ongoing}</div></div>
-          <div className="stat-card red"><div className="stat-title">Atrasadas ou em risco</div><div className="stat-value">{summary.delayed}</div></div>
-          <div className="stat-card green"><div className="stat-title">Concluídas</div><div className="stat-value">{summary.complete}</div></div>
-        </div>
-
         <div className="cards-result-count">
           {filtered.length} {filtered.length === 1 ? 'transmissão encontrada' : 'transmissões encontradas'}
         </div>
@@ -158,18 +153,8 @@ export default function Visualizacao({
           {filtered.length === 0 ? (
             <div className="empty-state">
               <SearchX className="icon-xl" />
-              {processedData.length === 0 ? (
-                <>
-                  <p style={{ fontWeight: 600 }}>Nenhum dado carregado.</p>
-                  <p style={{ fontSize: '.8rem' }}>Acesse o Banco de dados para importar as planilhas do projeto.</p>
-                  <button type="button" className="btn btn-primary" onClick={onOpenDatabase}>Abrir banco de dados</button>
-                </>
-              ) : (
-                <>
-                  <p style={{ fontWeight: 600 }}>Nenhuma transmissão encontrada.</p>
-                  <p style={{ fontSize: '.8rem' }}>Altere ou limpe um dos filtros para ver outros resultados.</p>
-                </>
-              )}
+              <p style={{ fontWeight: 600 }}>Nenhuma transmissão encontrada.</p>
+              <p style={{ fontSize: '.8rem' }}>Altere ou limpe um dos filtros para ver outros resultados.</p>
             </div>
           ) : (
             <>
@@ -178,7 +163,7 @@ export default function Visualizacao({
                   <CardTransmissao
                     key={card.id}
                     card={card}
-                    onSelect={handleCardClick} // ATUALIZADO: Chama a nossa nova função
+                    onSelect={onSelectCard}
                     index={index}
                   />
                 ))}
@@ -197,8 +182,7 @@ export default function Visualizacao({
         </div>
       </div>
 
-      {/* ATUALIZADO: Passa a initialTab para o Modal */}
-      {selectedCard && <ModalDetalhes card={selectedCard} initialTab={initialTab} onClose={onCloseModal} />}
+      {selectedCard && <ModalDetalhes card={selectedCard} onClose={onCloseModal} />}
     </>
   )
 }

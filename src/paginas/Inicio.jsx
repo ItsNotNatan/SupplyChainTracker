@@ -1,7 +1,7 @@
 import BotaoUpload from '../componentes/BotaoUpload.jsx'
 
 /**
- * Área de preparação e importação dos arquivos de origem.
+ * Página inicial: tela de upload de arquivos.
  * Renderiza sobre o dashboard enquanto nenhum dado foi processado.
  */
 export default function Inicio({ fileQueue, onAddFiles, onProcess, onDemo, feedback, onProcessSheets }) {

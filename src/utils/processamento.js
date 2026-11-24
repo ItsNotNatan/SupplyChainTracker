@@ -1,7 +1,7 @@
 import { excelToJSDate, cleanTr } from './formatadores.js'
 
 const EMPTY_TRIPLE = () => ({ planejado: null, previsto: null, realizado: null })
-const EMPTY_EXTERNAL_DATES = () => ({ entregaComau: null, criacaoPS: null, entregaUsuario: null })
+const EMPTY_EXTERNAL_DATES = () => ({ entregaComau: EMPTY_TRIPLE(), criacaoPS: EMPTY_TRIPLE(), entregaUsuario: EMPTY_TRIPLE() })
 
 const PERIOD_ALIASES = {
   planejado: ['plan', 'planejado', 'planeado', 'planned'],
@@ -83,6 +83,7 @@ function createHeaderInfo(rows = []) {
         mergedHeading = normalizeText(value)
         headerParts[columnIndex].push(mergedHeading)
       } else if (rowIndex < bestRow && mergedHeading) {
+        // Cabeçalhos agrupados/mesclados: replica o título do grupo nas colunas seguintes.
         headerParts[columnIndex].push(mergedHeading)
       }
     }
@@ -97,6 +98,8 @@ function findColumn(headers, aliases = [], excluded = []) {
   const normalizedExcluded = excluded.map(normalizeText).filter(Boolean)
 
   const matchesAlias = (header, alias) => {
+    // Abreviações curtas (RC, PO, PN, QTD) precisam ser palavras inteiras.
+    // Assim, "PO" não encontra por engano a coluna "Tipo".
     if (alias.length <= 3) return header.split(' ').includes(alias)
     return header.includes(alias)
   }
@@ -120,7 +123,6 @@ function readField(row, headerInfo, aliases, fallbackIndex = -1) {
 
 function readDate(value) {
   if (!hasValue(value)) return null
-  if (/^(?:wk|week|semana)\s*[-_/ ]?\s*\d{1,2}(?:\s*[-_/ ]\s*\d{2,4})?$/i.test(String(value).trim())) return null
   const date = excelToJSDate(value)
   return date && !Number.isNaN(date.getTime()) ? date : null
 }
@@ -141,20 +143,6 @@ function readDateTriple(row, headerInfo, milestoneAliases) {
   return result
 }
 
-function readExtraDate(row, headerInfo, aliases) {
-  const headers = headerInfo?.headers ?? []
-  for (const period of ['realizado', 'previsto', 'planejado']) {
-    const index = findMilestoneColumn(headers, aliases, PERIOD_ALIASES[period])
-    if (index >= 0) {
-      const date = readDate(row?.[index])
-      if (date) return date
-    }
-  }
-
-  const index = findColumn(headers, aliases)
-  return index >= 0 ? readDate(row?.[index]) : null
-}
-
 function firstAvailable(...values) {
   return values.find(value => hasValue(value)) ?? null
 }
@@ -169,6 +157,8 @@ function createMaterial(row, headerInfo, typeRaw, card) {
     ? (classificationText.includes('ja antecipado') ? 'Já antecipado' : 'Antecipação')
     : null
 
+  // A antecipação sempre prevalece: mesmo que a coluna de classe esteja como
+  // Construtivo, os itens Antecipação/Já antecipado pertencem a Comerciais.
   const isConstructive = !isAnticipated && (typeText.includes('construt') || typeText.includes('construct') || typeText.includes('custom'))
   const isCommercial = isAnticipated || typeText.includes('comercial') || typeText.includes('commercial')
 
@@ -181,7 +171,7 @@ function createMaterial(row, headerInfo, typeRaw, card) {
 
   const complementaryDates = {}
   EXTRA_DATES.forEach(extra => {
-    complementaryDates[extra.key] = readExtraDate(row, headerInfo, extra.aliases)
+    complementaryDates[extra.key] = readDateTriple(row, headerInfo, extra.aliases)
   })
 
   const quantity = readField(row, headerInfo, ['quantidade', 'qtd', 'quantity', 'qty'])
@@ -189,9 +179,6 @@ function createMaterial(row, headerInfo, typeRaw, card) {
   const reference = readField(row, headerInfo, ['referencia', 'reference', 'part number', 'part no', 'pn', 'ref', 'codigo', 'material code'])
   const manufacturer = readField(row, headerInfo, ['fabricante', 'manufacturer', 'marca', 'brand'])
   const supplier = readField(row, headerInfo, ['fornecedor', 'supplier', 'vendor'])
-  const supplierText = String(supplier ?? '').trim()
-  const validSupplier = supplierText && supplierText !== '-' && normalizeText(supplierText) !== 'construtivo' ? supplierText : ''
-  const supplierCandidates = Array.from(new Set([validSupplier, isConstructive ? card.construtivo?.fornecedor : ''].map(value => String(value ?? '').trim()).filter(value => value && value !== '-' && normalizeText(value) !== 'construtivo' && normalizeText(value) !== 'nao informado')))
   const releaseStatus = readField(row, headerInfo, ['status da liberacao', 'status liberacao', 'release status', 'liberacao status'])
   const rc = readField(row, headerInfo, ['numero da rc', 'n da rc', 'no da rc', 'rc', 'requisicao de compra'])
   const po = readField(row, headerInfo, ['numero da po', 'n da po', 'no da po', 'po', 'pedido de compra'])
@@ -204,14 +191,7 @@ function createMaterial(row, headerInfo, typeRaw, card) {
     descricao: String(description ?? '').trim(),
     referencia: String(reference ?? '').trim(),
     fabricante: String(manufacturer ?? '').trim(),
-    fornecedor: supplierCandidates.join(', '),
-    fornecedores: supplierCandidates,
-    fornecedoresDetalhes: supplierCandidates.map(nome => ({
-      nome,
-      rc: String(rc ?? '').trim(),
-      po: String(po ?? '').trim(),
-      statusLiberacao: String(releaseStatus ?? '').trim()
-    })),
+    fornecedor: String(supplier ?? (isConstructive ? card.construtivo?.fornecedor : '') ?? '').trim(),
     statusLiberacao: String(releaseStatus ?? '').trim(),
     rc: String(rc ?? '').trim(),
     po: String(po ?? '').trim(),
@@ -222,52 +202,13 @@ function createMaterial(row, headerInfo, typeRaw, card) {
 
 function addMaterialIfUnique(target, material) {
   const key = `${normalizeText(material.referencia)}|${normalizeText(material.descricao)}`
+  // Sem referência e sem descrição não há uma chave segura para deduplicação.
   if (key === '|') {
     target.push(material)
     return
   }
-
-  const existing = target.find(item => `${normalizeText(item.referencia)}|${normalizeText(item.descricao)}` === key)
-  if (!existing) {
-    target.push(material)
-    return
-  }
-
-  existing.fornecedoresDetalhes ??= []
-  for (const detail of material.fornecedoresDetalhes ?? []) {
-    const current = existing.fornecedoresDetalhes.find(item => normalizeText(item.nome) === normalizeText(detail.nome))
-    if (!current) {
-      existing.fornecedoresDetalhes.push({ ...detail })
-    } else {
-      for (const field of ['rc', 'po', 'statusLiberacao']) {
-        if (!hasValue(current[field]) && hasValue(detail[field])) current[field] = detail[field]
-      }
-    }
-  }
-
-  const supplierValues = [
-    ...(existing.fornecedores?.length ? existing.fornecedores : [existing.fornecedor]),
-    ...(material.fornecedores?.length ? material.fornecedores : [material.fornecedor]),
-    ...existing.fornecedoresDetalhes.map(item => item.nome)
-  ].map(value => String(value ?? '').trim())
-    .filter(value => value && value !== '-' && normalizeText(value) !== 'construtivo' && normalizeText(value) !== 'nao informado')
-  existing.fornecedores = Array.from(new Set(supplierValues))
-  existing.fornecedor = existing.fornecedores.join(', ')
-
-  for (const field of ['qtd', 'fabricante', 'statusLiberacao', 'rc', 'po', 'nf', 'pull']) {
-    if (!hasValue(existing[field]) && hasValue(material[field])) existing[field] = material[field]
-  }
-  for (const [milestone, triple] of Object.entries(material.datas ?? {})) {
-    existing.datas ??= {}
-    existing.datas[milestone] ??= EMPTY_TRIPLE()
-    for (const period of ['planejado', 'previsto', 'realizado']) {
-      if (!existing.datas[milestone][period] && triple?.[period]) existing.datas[milestone][period] = triple[period]
-    }
-  }
-  for (const [keyName, value] of Object.entries(material.datasComplementares ?? {})) {
-    existing.datasComplementares ??= EMPTY_EXTERNAL_DATES()
-    if (!existing.datasComplementares[keyName] && value) existing.datasComplementares[keyName] = value
-  }
+  const exists = target.some(item => `${normalizeText(item.referencia)}|${normalizeText(item.descricao)}` === key)
+  if (!exists) target.push(material)
 }
 
 function statusFromValues(values) {
@@ -292,8 +233,8 @@ function statusFromMaterials(items, today) {
   const hasDelay = items.some(item => {
     const deadline = item.datas?.pedido?.previsto ||
       item.datas?.requisicao?.previsto ||
-      item.datasComplementares?.entregaComau ||
-      item.datasComplementares?.entregaUsuario
+      item.datasComplementares?.entregaComau?.previsto ||
+      item.datasComplementares?.entregaUsuario?.previsto
     return deadline instanceof Date && deadline < today && !item.po
   })
   if (hasDelay || items.some(item => /atras/i.test(item.statusLiberacao))) return 'On delayed'
@@ -315,7 +256,6 @@ export function processarDados(sheets = {}) {
     followUp: Array.isArray(sheets.followUp) ? sheets.followUp : [],
     saturacao: Array.isArray(sheets.saturacao) ? sheets.saturacao : [],
     bordomaquina: Array.isArray(sheets.bordomaquina) ? sheets.bordomaquina : [],
-    pcpManufacturing: Array.isArray(sheets.pcpManufacturing) ? sheets.pcpManufacturing : [],
     comerciais: Array.isArray(sheets.comerciais) ? sheets.comerciais : [],
     prpo: Array.isArray(sheets.prpo) ? sheets.prpo : [],
     sourcingPlans: Array.isArray(sheets.sourcingPlans) ? sheets.sourcingPlans : (Array.isArray(sheets.sourcingPlan) && sheets.sourcingPlan.length ? [sheets.sourcingPlan] : [])
@@ -345,6 +285,7 @@ export function processarDados(sheets = {}) {
     return trMap.get(id)
   }
 
+  // 1. Risco/saturação de fornecedores
   const saturationInfo = createHeaderInfo(safeSheets.saturacao)
   safeSheets.saturacao.slice(saturationInfo.dataStart).forEach(row => {
     if (!Array.isArray(row) || !row.length) return
@@ -358,60 +299,50 @@ export function processarDados(sheets = {}) {
     })
   })
 
-  const manufacturingRows = safeSheets.pcpManufacturing.length ? safeSheets.pcpManufacturing : safeSheets.bordomaquina
-  const boardInfo = createHeaderInfo(manufacturingRows)
-  manufacturingRows.slice(boardInfo.dataStart).forEach(row => {
+  // 2. Bordo de Máquina / dados de manufatura
+  const boardInfo = createHeaderInfo(safeSheets.bordomaquina)
+  safeSheets.bordomaquina.slice(boardInfo.dataStart).forEach(row => {
     if (!Array.isArray(row) || row.length < 2) return
-    const transmissionFallbackIndex = safeSheets.pcpManufacturing.length ? 11 : 1
-    const transmission = cleanTr(readField(row, boardInfo, ['transmissao', 'id da transmissao', 'transmission'], transmissionFallbackIndex))
+    const transmission = cleanTr(readField(row, boardInfo, ['transmissao', 'id da transmissao', 'transmission'], 1))
     if (!transmission || normalizeText(transmission).includes('transmissao')) return
 
     const card = getOrCreateCard(transmission)
-    const operation = readField(row, boardInfo, ['operacao', 'operation'], safeSheets.pcpManufacturing.length ? -1 : 2)
+    const operation = readField(row, boardInfo, ['operacao', 'operation'], 2)
     if (hasValue(operation)) card.operacao = String(operation).trim()
 
-    const deliveryFallbackIndex = safeSheets.pcpManufacturing.length ? 41 : 3
-    const deliveryAliases = safeSheets.pcpManufacturing.length
-      ? ['data de entrega do dispositivo', 'entrega do dispositivo', 'data entrega']
-      : ['data de entrega do dispositivo', 'entrega do dispositivo', 'data entrega', 'data']
-    const deliveryRaw = readField(row, boardInfo, deliveryAliases, deliveryFallbackIndex)
-    const deliveryDate = readDate(deliveryRaw)
+    const deliveryDate = readDate(readField(row, boardInfo, ['data de entrega do dispositivo', 'entrega do dispositivo', 'data entrega', 'data'], 3))
     const deliveryTriple = readDateTriple(row, boardInfo, ['entrega do dispositivo', 'entrega dispositivo', 'data entrega dispositivo', 'device delivery', 'delivery of device'])
-    
-    if (!deliveryTriple.previsto) deliveryTriple.previsto = deliveryDate
+    if (!deliveryTriple.realizado) deliveryTriple.realizado = deliveryDate
 
-    const projectElectrical = readField(row, boardInfo, ['projeto eletrico', 'proj ele'], safeSheets.pcpManufacturing.length ? -1 : 6)
-    const projectTopographic = readField(row, boardInfo, ['topografico', 'projeto topografico', 'proj top'], safeSheets.pcpManufacturing.length ? -1 : 8)
-    const materialElectrical = readField(row, boardInfo, ['material eletrico', 'mat ele'], safeSheets.pcpManufacturing.length ? -1 : 9)
-    const materialPneumatic = readField(row, boardInfo, ['material pneumatica', 'material pneumatico', 'mat pneu'], safeSheets.pcpManufacturing.length ? -1 : 10)
-    const tests = readField(row, boardInfo, ['inspecao da qualidade', 'inspecao qualidade', 'status testes', 'testes'], safeSheets.pcpManufacturing.length ? -1 : 15)
-    const processControl = readField(row, boardInfo, ['controle de processo', 'status de manufatura', 'status manufatura', 'process control'], -1)
+    const projectElectrical = readField(row, boardInfo, ['projeto eletrico', 'proj ele'], 6)
+    const projectTopographic = readField(row, boardInfo, ['topografico', 'projeto topografico', 'proj top'], 8)
+    const materialElectrical = readField(row, boardInfo, ['material eletrico', 'mat ele'], 9)
+    const materialPneumatic = readField(row, boardInfo, ['material pneumatica', 'material pneumatico', 'mat pneu'], 10)
+    const tests = readField(row, boardInfo, ['inspecao da qualidade', 'inspecao qualidade', 'status testes', 'testes'], 15)
 
     const listMaterialsMechanical = readField(row, boardInfo, ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'])
-    const listMaterialsControls = readField(row, boardInfo, ['lista de materiais de controls', 'lista materiais controls', 'lista de materiais controls'])
+    const listMaterialsControls = readField(row, boardInfo, ['lista de materiais de control', 'lista de materiais de controls', 'lista materiais controls', 'lista de materiais controls'])
 
     card.pcp = {
       dataEntrega: deliveryDate,
-      semanaEntrega: deliveryRaw && !deliveryDate ? String(deliveryRaw).trim() : '',
       projEle: projectElectrical || '-',
       projTop: projectTopographic || '-',
       matEle: materialElectrical || '0',
       matPneu: materialPneumatic || '0',
-      misc: readField(row, boardInfo, ['miscelaneas', 'misc'], safeSheets.pcpManufacturing.length ? -1 : 11) || '-',
-      placaAlum: readField(row, boardInfo, ['placa', 'placa aluminio', 'placa alum'], safeSheets.pcpManufacturing.length ? -1 : 12) || '-',
-      etiQ: readField(row, boardInfo, ['etiquetas', 'etiqueta', 'etiq'], safeSheets.pcpManufacturing.length ? -1 : 13) || '-',
-      qrCode: readField(row, boardInfo, ['qr code', 'qrcode', 'qr'], safeSheets.pcpManufacturing.length ? -1 : 14) || '-',
+      misc: readField(row, boardInfo, ['miscelaneas', 'misc'], 11) || '-',
+      placaAlum: readField(row, boardInfo, ['placa', 'placa aluminio', 'placa alum'], 12) || '-',
+      etiQ: readField(row, boardInfo, ['etiquetas', 'etiqueta', 'etiq'], 13) || '-',
+      qrCode: readField(row, boardInfo, ['qr code', 'qrcode', 'qr'], 14) || '-',
       testes: tests || '-',
       inspecaoQualidade: tests || '-',
-      controleProcesso: processControl || '',
-      obsPcp: readField(row, boardInfo, ['observacao', 'obs'], safeSheets.pcpManufacturing.length ? -1 : 16) || '',
+      obsPcp: readField(row, boardInfo, ['observacao', 'obs'], 16) || '',
       listaMatMec: listMaterialsMechanical || 'Não mapeado',
       listaMatControls: listMaterialsControls || 'Não mapeado',
       listaIdent: readField(row, boardInfo, ['lista de identificacoes', 'lista identificacoes'], -1) || 'Não mapeado',
       layoutCalha: readField(row, boardInfo, ['layout de calha', 'layout calha'], -1) || 'Não mapeado',
       montagemMecanica: readField(row, boardInfo, ['montagem mecanica', 'mechanical assembly'], -1) || '',
       medicao3D: readField(row, boardInfo, ['medicao 3d', 'medicao tridimensional', '3d measurement'], -1) || '',
-      bordoMaquina: readField(row, boardInfo, ['bordo maquina', 'status bordo maquina'], -1) || '',
+      bordoMaquina: readField(row, boardInfo, ['bordo maquina', 'status bordo maquina'], -1) || 'Registrado no PCP',
       entregaDispositivo: deliveryTriple
     }
 
@@ -422,6 +353,7 @@ export function processarDados(sheets = {}) {
     card.manufatura.entregaDispositivo = deliveryTriple
   })
 
+  // 3. Follow-up: projeto, linha, estratégia e dados construtivos
   const followInfo = createHeaderInfo(safeSheets.followUp)
   safeSheets.followUp.slice(followInfo.dataStart).forEach(row => {
     if (!Array.isArray(row) || row.length < 5) return
@@ -489,6 +421,7 @@ export function processarDados(sheets = {}) {
     if (hasValue(measurement3D)) card.manufatura.medicao3D = String(measurement3D).trim()
   })
 
+  // 4. Sourcing Plan: classificação (coluna B) e transmissão (coluna M)
   safeSheets.sourcingPlans.forEach(sourcingTable => {
     const sourcingInfo = createHeaderInfo(sourcingTable)
     sourcingTable.slice(sourcingInfo.dataStart).forEach(row => {
@@ -513,6 +446,7 @@ export function processarDados(sheets = {}) {
     })
   })
 
+  // 5. Abas legadas Comerciais/PRPO (mantidas como compatibilidade)
   const processLegacyCommercialSheet = (sheet) => {
     if (!Array.isArray(sheet) || sheet.length === 0) return
     const info = createHeaderInfo(sheet)
@@ -545,12 +479,20 @@ export function processarDados(sheets = {}) {
         pull: readField(row, info, ['pull', 'pull system'], 14) || ''
       }
       addMaterialIfUnique(card.materiais.comerciais, material)
+
+      const freight = readField(row, info, ['incoterm', 'frete'], 21)
+      const costCenter = readField(row, info, ['centro de custo', 'wbs'], 19)
+      const cargoDate = readDate(readField(row, info, ['data presenca carga', 'presenca carga'], 25))
+      if (hasValue(freight)) card.logisticaAdvanced.frete = freight
+      if (hasValue(costCenter)) card.logisticaAdvanced.cc = costCenter
+      if (cargoDate) card.logisticaAdvanced.presencaCarga = cargoDate
     })
   }
 
   safeSheets.comerciais.forEach(processLegacyCommercialSheet)
   if (safeSheets.prpo.length) processLegacyCommercialSheet(safeSheets.prpo)
 
+  // 6. Fallback construtivo para transmissões que ainda não têm a linha do Sourcing Plan
   trMap.forEach(card => {
     if (card.construtivo && card.materiais.construtivos.length === 0) {
       const constructive = card.construtivo
@@ -563,8 +505,6 @@ export function processarDados(sheets = {}) {
         referencia: constructive.rev || '',
         fabricante: '',
         fornecedor: constructive.fornecedor || '',
-        fornecedores: constructive.fornecedor && constructive.fornecedor !== '-' && normalizeText(constructive.fornecedor) !== 'construtivo' ? [constructive.fornecedor] : [],
-        fornecedoresDetalhes: constructive.fornecedor && constructive.fornecedor !== '-' && normalizeText(constructive.fornecedor) !== 'construtivo' ? [{ nome: constructive.fornecedor, rc: constructive.rc || '', po: constructive.oc || '', statusLiberacao: constructive.statusSys || constructive.status || '' }] : [],
         statusLiberacao: constructive.statusSys || constructive.status || '',
         rc: constructive.rc || '',
         po: constructive.oc || '',
@@ -579,6 +519,7 @@ export function processarDados(sheets = {}) {
     }
   })
 
+  // 7. Status individuais das quatro classes (não existe status global)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -599,17 +540,10 @@ export function processarDados(sheets = {}) {
 
     const commercialStatus = statusFromMaterials(card.materiais.comerciais, today)
     const constructiveStatus = statusFromMaterials(card.materiais.construtivos, today)
-    if (card.construtivo?.dtNecessidade && !card.manufatura.entregaDispositivo?.planejado) {
-      card.manufatura.entregaDispositivo.planejado = card.construtivo.dtNecessidade
-    }
-
     const qualityStatus = statusFromValues([card.manufatura.inspecaoQualidade || card.pcp?.testes])
-    const processControlStatus = statusFromValues([card.pcp?.controleProcesso])
-    const manufacturingStatus = hasValue(card.pcp?.controleProcesso)
-      ? processControlStatus
-      : (card.pcp || hasValue(card.manufatura.estrategia) || hasValue(card.manufatura.montagemMecanica)
-          ? (qualityStatus === 'Complete' ? 'Complete' : qualityStatus === 'On delayed' ? 'On delayed' : 'Ongoing')
-          : 'Vazio')
+    const manufacturingStatus = card.pcp || hasValue(card.manufatura.estrategia) || hasValue(card.manufatura.montagemMecanica)
+      ? (qualityStatus === 'Complete' ? 'Complete' : qualityStatus === 'On delayed' ? 'On delayed' : 'Ongoing')
+      : 'Vazio'
 
     return {
       ...card,
@@ -662,20 +596,6 @@ export const DEMO_SHEETS = {
     ['Comercial', 4, 'Sensor M12', 'PN123', 'Phoenix Contact', 'Liberado', 'RC-001', 'PO-001', 46000, 46010, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
     ['Construtivo', 2, 'Suporte de fixação', 'SUP-002', '', 'Em cotação', 'RC-002', '', 46000, 46020, '', 'STW', 'BB37-VW-ANCH-STW-UB2-0002-2025'],
     ['Antecipação', 1, 'Conector M12 antecipado', 'PN-ANT-1', 'Phoenix Contact', 'Liberado', 'RC-003', 'PO-003', 46000, 46002, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Já antecipado', 3, 'Cabo já antecipado', 'PN-ANT-2', 'Siemens', 'Liberado', 'RC-004', 'PO-004', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    
-    // NOVOS ITENS INJETADOS PARA ATIVAR A PAGINAÇÃO (Total > 12 itens)
-    ['Comercial', 1, 'Fonte de Alimentação 24V 10A', 'PWR-24-10', 'Siemens', 'Liberado', 'RC-005', 'PO-005', 46000, 46005, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 2, 'Módulo de I/O Digital', 'IO-DIG-32', 'Festo', 'Em andamento', 'RC-006', '', 46000, 46015, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 1, 'CLP Principal', 'PLC-S7-1500', 'Siemens', 'Atrasado', 'RC-007', '', 46000, 46001, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 10, 'Relé Auxiliar 24V', 'REL-24V', 'Finder', 'Liberado', 'RC-008', 'PO-008', 46000, 46002, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 5, 'Contator de Potência', 'CONT-9A', 'Schneider', 'Liberado', 'RC-009', 'PO-009', 46000, 46005, 46004, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 2, 'Disjuntor Motor', 'DISJ-M-4A', 'Schneider', 'Em cotação', 'RC-010', '', 46000, 46012, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 50, 'Borne de Passagem 2.5mm', 'BORN-2.5', 'Weidmüller', 'Liberado', 'RC-011', 'PO-011', 46000, 46003, 46002, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 1, 'Switch Ethernet Industrial 8 portas', 'SWI-ETH-8', 'Cisco', 'Liberado', 'RC-012', 'PO-012', 46000, 46005, 46005, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 4, 'Cabo Profinet 5m', 'CBL-PN-5M', 'Lapp Kabel', 'Liberado', 'RC-013', 'PO-013', 46000, 46006, 46004, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 2, 'IHM Touch 7"', 'HMI-7-TOUCH', 'Siemens', 'Em cotação', 'RC-014', '', 46000, 46020, '', 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 1, 'Sinalizador Luminoso 3 Cores', 'TOW-3C', 'Banner', 'Liberado', 'RC-015', 'PO-015', 46000, 46002, 46002, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025'],
-    ['Comercial', 1, 'Botão de Emergência', 'BTN-EMG', 'Eaton', 'Liberado', 'RC-016', 'PO-016', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025']
+    ['Já antecipado', 3, 'Cabo já antecipado', 'PN-ANT-2', 'Siemens', 'Liberado', 'RC-004', 'PO-004', 46000, 46001, 46001, 'AUFBAU', 'VW427-PATAGONIA-AUFBAU-0035-2025']
   ]]
 }
