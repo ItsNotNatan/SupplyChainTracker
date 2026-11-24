@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
+import { getMaterialScheduleStatus, getMilestoneScheduleStatus } from '../utils/statusCronograma.js'
 
 const MATERIAL_MILESTONES = [
   { key: 'liberacao', label: 'Liberação' },
@@ -408,15 +409,25 @@ function MaterialCard({ item, category }) {
   const manufacturerLabel = isCommercial ? 'Fabricante' : 'Construtivos'
   const manufacturerValue = isCommercial ? item.fabricante : (item.fornecedor || item.fabricante)
   const combinedDates = { ...(item.datas || {}), ...(item.datasComplementares || {}) }
+  const overallStatus = getMaterialScheduleStatus(item, MATERIAL_MILESTONES.map(milestone => milestone.key))
 
   return (
-    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'}`}>
+    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'} ${isCommercial ? `material-schedule-${overallStatus.code}` : ''}`}>
       <div className="material-card-heading">
         <div>
           <div className="material-type-label">{isCommercial ? 'Material comercial' : 'Material construtivo'}</div>
           <h4 className="material-description">{item.descricao || 'Descrição não informada'}</h4>
         </div>
-        {item.tag && <span className="anticipation-tag">{item.tag}</span>}
+        <div className="material-card-heading-status">
+          {isCommercial && (
+            <span
+              className={`material-overall-status-dot ${overallStatus.code}`}
+              title={overallStatus.label}
+              aria-label={overallStatus.label}
+            />
+          )}
+          {item.tag && <span className="anticipation-tag">{item.tag}</span>}
+        </div>
       </div>
 
       <div className="material-fields">
@@ -456,9 +467,19 @@ function DateTable({ title, dates = {}, milestones, compact = false }) {
           <tbody>
             {milestones.map(({ key, label }) => {
               const triple = dates?.[key] || {}
+              const milestoneStatus = getMilestoneScheduleStatus(triple)
               return (
                 <tr key={key}>
-                  <th scope="row">{label}</th>
+                  <th scope="row">
+                    <span className="date-milestone-label">
+                      <span
+                        className={`milestone-status-dot ${milestoneStatus.code}`}
+                        title={milestoneStatus.label}
+                        aria-label={milestoneStatus.label}
+                      />
+                      <span>{label}</span>
+                    </span>
+                  </th>
                   <td>{formatDate(triple.planejado)}</td>
                   <td>{formatDate(triple.previsto)}</td>
                   <td>{formatDate(triple.realizado)}</td>

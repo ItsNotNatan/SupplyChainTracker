@@ -1,4 +1,5 @@
 import { excelToJSDate, cleanTr } from './formatadores.js'
+import { getMaterialCollectionStatus } from './statusCronograma.js'
 
 const EMPTY_TRIPLE = () => ({ planejado: null, previsto: null, realizado: null })
 const EMPTY_EXTERNAL_DATES = () => ({ entregaComau: EMPTY_TRIPLE(), criacaoPS: EMPTY_TRIPLE(), entregaUsuario: EMPTY_TRIPLE() })
@@ -37,7 +38,7 @@ function hasValue(value) {
 
 function isPlaceholder(value) {
   const normalized = normalizeText(value)
-  return !normalized || ['-', 'n a', 'na', 'n a o mapeado', 'nao mapeado', 'pendente', 's descricao'].includes(normalized)
+  return !normalized || ['-', 'n a', 'na', 'n a o mapeado', 'nao mapeado', 'not mapped', 'nao informado', 'sem informacao', 's descricao'].includes(normalized)
 }
 
 function createHeaderInfo(rows = []) {
@@ -227,27 +228,6 @@ function aggregateStatuses(statuses) {
   return active.every(status => status === 'Complete') ? 'Complete' : 'Ongoing'
 }
 
-function statusFromMaterials(items, today) {
-  if (!items.length) return 'Vazio'
-
-  const hasDelay = items.some(item => {
-    const deadline = item.datas?.pedido?.previsto ||
-      item.datas?.requisicao?.previsto ||
-      item.datasComplementares?.entregaComau?.previsto ||
-      item.datasComplementares?.entregaUsuario?.previsto
-    return deadline instanceof Date && deadline < today && !item.po
-  })
-  if (hasDelay || items.some(item => /atras/i.test(item.statusLiberacao))) return 'On delayed'
-
-  const everyItemComplete = items.every(item => {
-    const released = /liberad|conclu|complete|100%/i.test(item.statusLiberacao)
-    const hasRc = !isPlaceholder(item.rc)
-    const hasPo = !isPlaceholder(item.po)
-    return (released || (hasRc && hasPo)) && hasRc && hasPo
-  })
-  return everyItemComplete ? 'Complete' : 'Ongoing'
-}
-
 export function processarDados(sheets = {}) {
   const trMap = new Map()
   const supRiscoMap = new Map()
@@ -342,7 +322,7 @@ export function processarDados(sheets = {}) {
       layoutCalha: readField(row, boardInfo, ['layout de calha', 'layout calha'], -1) || 'Não mapeado',
       montagemMecanica: readField(row, boardInfo, ['montagem mecanica', 'mechanical assembly'], -1) || '',
       medicao3D: readField(row, boardInfo, ['medicao 3d', 'medicao tridimensional', '3d measurement'], -1) || '',
-      bordoMaquina: readField(row, boardInfo, ['bordo maquina', 'status bordo maquina'], -1) || 'Registrado no PCP',
+      bordoMaquina: readField(row, boardInfo, ['bordo maquina', 'status bordo maquina'], -1) || 'Não mapeado',
       entregaDispositivo: deliveryTriple
     }
 
@@ -520,9 +500,6 @@ export function processarDados(sheets = {}) {
   })
 
   // 7. Status individuais das quatro classes (não existe status global)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
   const processedData = Array.from(trMap.values()).map(card => {
     const mechanicalStatus = statusFromValues([
       card.construtivo?.des2D,
@@ -538,11 +515,23 @@ export function processarDados(sheets = {}) {
       card.pcp?.layoutCalha
     ])
 
-    const commercialStatus = statusFromMaterials(card.materiais.comerciais, today)
-    const constructiveStatus = statusFromMaterials(card.materiais.construtivos, today)
-    const qualityStatus = statusFromValues([card.manufatura.inspecaoQualidade || card.pcp?.testes])
-    const manufacturingStatus = card.pcp || hasValue(card.manufatura.estrategia) || hasValue(card.manufatura.montagemMecanica)
-      ? (qualityStatus === 'Complete' ? 'Complete' : qualityStatus === 'On delayed' ? 'On delayed' : 'Ongoing')
+    // O status de Comerciais/Construtivos acompanha as datas Planejado,
+    // Previsto e Realizado dos marcos; não usa apenas a existência de RC/PO.
+    const commercialStatus = getMaterialCollectionStatus(card.materiais.comerciais)
+    const constructiveStatus = getMaterialCollectionStatus(card.materiais.construtivos)
+
+    // Só considera etapas reais de manufatura. A existência de um objeto PCP,
+    // por si só, não significa que a etapa esteja em andamento ou concluída.
+    const manufacturingValues = [
+      card.manufatura.montagemMecanica,
+      card.manufatura.medicao3D,
+      card.manufatura.bordoMaquina,
+      card.manufatura.inspecaoQualidade,
+      card.pcp?.testes
+    ]
+    const manufacturingHasData = manufacturingValues.some(value => !isPlaceholder(value))
+    const manufacturingStatus = manufacturingHasData
+      ? statusFromValues(manufacturingValues)
       : 'Vazio'
 
     return {

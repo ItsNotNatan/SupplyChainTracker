@@ -1871,3 +1871,78 @@ body {
     font-size: .68rem;
   }
 }
+
+
+/* ══════════════════════════════════════════
+   SEMÁFOROS DOS MARCOS E STATUS DOS COMERCIAIS
+   Verde: realizado até a data planejada.
+   Vermelho: previsão ou realização posterior ao planejado.
+   Cinza: sem dados suficientes; amarelo aguarda definição do negócio.
+══════════════════════════════════════════ */
+.material-card-heading-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .45rem;
+  flex-shrink: 0;
+}
+
+.material-overall-status-dot,
+.milestone-status-dot {
+  display: inline-block;
+  width: .62rem;
+  height: .62rem;
+  flex: 0 0 .62rem;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, .16);
+  background: #94a3b8;
+  vertical-align: middle;
+}
+
+.material-overall-status-dot.complete,
+.milestone-status-dot.complete {
+  background: #16a34a;
+  border-color: #15803d;
+}
+
+.material-overall-status-dot.delayed,
+.milestone-status-dot.delayed {
+  background: #dc2626;
+  border-color: #b91c1c;
+}
+
+.material-overall-status-dot.unknown,
+.milestone-status-dot.unknown {
+  background: #94a3b8;
+  border-color: #64748b;
+}
+
+.material-card.material-schedule-complete {
+  border-color: rgba(22, 163, 74, .55);
+  border-left-color: #16a34a;
+  background: rgba(22, 163, 74, .055);
+}
+
+.material-card.material-schedule-delayed {
+  border-color: rgba(220, 38, 38, .58);
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, .055);
+}
+
+.material-card.material-schedule-unknown {
+  border-color: var(--border-mid);
+}
+
+.date-milestone-label {
+  display: inline-flex;
+  align-items: center;
+  gap: .42rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .material-overall-status-dot,
+  .milestone-status-dot {
+    transition: none !important;
+    animation: none !important;
+  }
+}
