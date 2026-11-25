@@ -1,9 +1,9 @@
-import { PenTool, DollarSign, Settings, Factory } from 'lucide-react'
+import { PenTool, Package, Settings, Factory } from 'lucide-react'
 import { getTheme } from '../utils/formatadores.js'
 
 const STAGES = [
   { key: 'Engenharia', label: 'Engenharia', Icon: PenTool },
-  { key: 'Comerciais', label: 'Comerciais', Icon: DollarSign },
+  { key: 'Comerciais', label: 'Comerciais', Icon: Package },
   { key: 'Construtivos', label: 'Construtivos', Icon: Settings },
   { key: 'Manufatura', label: 'Manufatura', Icon: Factory }
 ]

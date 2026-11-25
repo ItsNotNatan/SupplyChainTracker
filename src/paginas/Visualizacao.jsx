@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Filter, SearchX, ChevronDown, Search } from 'lucide-react'
 import CardTransmissao from '../componentes/CardTransmissao.jsx'
+import FiltroMultiplo from '../componentes/FiltroMultiplo.jsx'
 import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
 
 const PAGE_SIZE = 48
@@ -79,9 +80,12 @@ export default function Visualizacao({
     const keyword = normalizeSearch(filters.palavraChave)
     return processedData.filter(card => {
       const keywordMatch = !keyword || getSearchText(card).includes(keyword)
-      const projectMatch = !filters.projeto || card.projeto === filters.projeto
-      const lineMatch = !filters.linha || card.linha === filters.linha
-      const operationMatch = !filters.operacao || card.operacao === filters.operacao
+      const selectedProjects = (Array.isArray(filters.projeto) ? filters.projeto : (filters.projeto ? [filters.projeto] : [])).map(normalizeSearch)
+      const selectedLines = (Array.isArray(filters.linha) ? filters.linha : (filters.linha ? [filters.linha] : [])).map(normalizeSearch)
+      const selectedOperations = (Array.isArray(filters.operacao) ? filters.operacao : (filters.operacao ? [filters.operacao] : [])).map(normalizeSearch)
+      const projectMatch = selectedProjects.length === 0 || selectedProjects.includes(normalizeSearch(card.projeto))
+      const lineMatch = selectedLines.length === 0 || selectedLines.includes(normalizeSearch(card.linha))
+      const operationMatch = selectedOperations.length === 0 || selectedOperations.includes(normalizeSearch(card.operacao))
       return keywordMatch && projectMatch && lineMatch && operationMatch
     })
   }, [processedData, filters])
@@ -110,39 +114,27 @@ export default function Visualizacao({
               onChange={event => onFilterChange('palavraChave', event.target.value)}
             />
           </div>
-          <select
-            className="filter-select"
+          <FiltroMultiplo
+            label="Projeto"
+            placeholder="Todos os projetos"
+            options={Array.from(uniqueProjetos)}
             value={filters.projeto}
-            onChange={event => onFilterChange('projeto', event.target.value)}
-            aria-label="Filtrar por projeto"
-          >
-            <option value="">Todos os projetos</option>
-            {Array.from(uniqueProjetos).sort().map(project => (
-              <option key={project} value={project}>{project}</option>
-            ))}
-          </select>
-          <select
-            className="filter-select"
+            onChange={value => onFilterChange('projeto', value)}
+          />
+          <FiltroMultiplo
+            label="Linha"
+            placeholder="Todas as linhas"
+            options={Array.from(uniqueLinhas)}
             value={filters.linha}
-            onChange={event => onFilterChange('linha', event.target.value)}
-            aria-label="Filtrar por linha"
-          >
-            <option value="">Todas as linhas</option>
-            {Array.from(uniqueLinhas).sort().map(line => (
-              <option key={line} value={line}>{line}</option>
-            ))}
-          </select>
-          <select
-            className="filter-select"
+            onChange={value => onFilterChange('linha', value)}
+          />
+          <FiltroMultiplo
+            label="Operação"
+            placeholder="Todas as operações"
+            options={Array.from(uniqueOperacoes)}
             value={filters.operacao}
-            onChange={event => onFilterChange('operacao', event.target.value)}
-            aria-label="Filtrar por operação"
-          >
-            <option value="">Todas as operações</option>
-            {Array.from(uniqueOperacoes).sort().map(operation => (
-              <option key={operation} value={operation}>{operation}</option>
-            ))}
-          </select>
+            onChange={value => onFilterChange('operacao', value)}
+          />
         </div>
 
         <div className="cards-result-count">

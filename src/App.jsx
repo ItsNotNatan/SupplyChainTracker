@@ -19,9 +19,9 @@ const SHEETS_INICIAL = {
 
 const FILTERS_INICIAIS = {
   palavraChave: '',
-  projeto: '',
-  linha: '',
-  operacao: ''
+  projeto: [],
+  linha: [],
+  operacao: []
 }
 
 export default function App() {

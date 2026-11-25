@@ -1,9 +1,9 @@
-import { Folder, Hash, PenTool, DollarSign, Settings, Factory } from 'lucide-react'
+import { Folder, Hash, PenTool, Package, Settings, Factory } from 'lucide-react'
 import { getTheme } from '../utils/formatadores.js'
 
 const STAGES_MAP = [
   { key: 'Engenharia', label: 'Engenharia', icon: PenTool },
-  { key: 'Comerciais', label: 'Comerciais', icon: DollarSign },
+  { key: 'Comerciais', label: 'Comerciais', icon: Package },
   { key: 'Construtivos', label: 'Construtivos', icon: Settings },
   { key: 'Manufatura', label: 'Manufatura', icon: Factory }
 ]
@@ -27,17 +27,20 @@ export default function CardTransmissao({ card, onSelect, index = 0 }) {
       style={{ animationDelay: `${Math.min(index * 40, 480)}ms` }}
     >
       <div className="card-header">
-        <div className="transmission-meta">
-          <span className="card-tag"><Folder className="icon-inline" /> Projeto: {card.projeto || 'Não informado'}</span>
-          <span className="card-tag">Linha: {card.linha || '—'}</span>
-          <span className="card-tag">Operação: {card.operacao || '—'}</span>
-          <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
+        <div className="transmission-meta" aria-label="Identificação da transmissão">
+          <div className="transmission-meta-row">
+            <span className="card-tag"><Folder className="icon-inline" /> Projeto: {card.projeto || 'Não informado'}</span>
+            <span className="card-tag">Linha: {card.linha || '—'}</span>
+          </div>
+          <div className="transmission-meta-row">
+            <span className="card-tag">Operação: {card.operacao || '—'}</span>
+            <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
+          </div>
         </div>
-        <span className="transmission-id">ID: {card.id}</span>
+        <span className="transmission-id" aria-label={`Número da transmissão ${card.id}`}>{card.id}</span>
       </div>
 
       <p className="card-desc"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
-
 
       <div className="card-stages" aria-label="Status das classes">
         {STAGES_MAP.map(({ key, label, icon: StageIcon }) => {
@@ -54,7 +57,6 @@ export default function CardTransmissao({ card, onSelect, index = 0 }) {
           )
         })}
       </div>
-      <span className="card-open-hint">Clique para visualizar os detalhes</span>
     </article>
   )
 }

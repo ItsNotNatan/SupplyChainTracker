@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  X, Folder, Hash, PenTool, DollarSign, Settings, Factory,
+  X, Hash, PenTool, Package, Settings, Factory,
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search, RotateCcw
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
@@ -56,14 +56,14 @@ export default function ModalDetalhes({ card, onClose }) {
       <div className="modal-content">
         <div className="modal-header">
           <div className="modal-header-info">
-            <div className="modal-eyebrow"><Folder className="icon-sm" /> Projeto: {card.projeto || 'Não informado'}</div>
-            <h2 className="modal-title">ID: {card.id}</h2>
-            <p className="modal-description"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
-            <div className="modal-tags">
+            <h2 className="modal-title">{card.id}</h2>
+            <div className="modal-tags modal-tags-inline" aria-label="Identificação da transmissão">
+              <span className="badge-outline">Projeto: {card.projeto || 'Não informado'}</span>
               <span className="badge-outline">Linha: {card.linha || '—'}</span>
               <span className="badge-outline">Operação: {card.operacao || '—'}</span>
               <span className="badge-outline"><Hash className="icon-sm" /> Qtd: {card.qtd || 1}</span>
             </div>
+            <p className="modal-description"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Fechar detalhes">
             <X className="icon-md" />
@@ -104,7 +104,7 @@ export default function ModalDetalhes({ card, onClose }) {
 
             {showCommercial && (
               <section className={`detail-section material-detail-section ${!showAll ? 'full-width' : ''}`}>
-                <SectionTitle icon={DollarSign} title="Comerciais" status={card.stages?.Comerciais} />
+                <SectionTitle icon={Package} title="Comerciais" status={card.stages?.Comerciais} />
                 {commercialItems.length > 0 ? (
                   <MaterialListExplorer items={commercialItems} category="commercial" />
                 ) : (
@@ -168,7 +168,7 @@ function MaterialCategorySelector({
       title: 'Comerciais',
       description: 'Visualizar somente os materiais comerciais desta transmissão',
       count: commercialCount,
-      icon: DollarSign,
+      icon: Package,
       className: 'commercial'
     },
     {
