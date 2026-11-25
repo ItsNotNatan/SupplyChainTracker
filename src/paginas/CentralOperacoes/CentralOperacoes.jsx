@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Database, ArrowRight } from 'lucide-react'
+import { Eye, Settings, ArrowRight } from 'lucide-react'
 import logoComau from '../../assets/logo-comau.png'
 import './CentralOperacoes.css'
 
@@ -25,12 +25,14 @@ export default function CentralOperacoes({ onOpenSupplyChain, onOpenDatabase, ha
       <div className="sct-home-hub-content">
         <header className="sct-home-hub-header">
           <img src={logoComau} alt="Logo COMAU" className="sct-home-hub-logo" />
-          <span className="sct-home-kicker">PLATAFORMA DE GESTÃO DE PROJETOS</span>
+          <span className="sct-home-kicker">PLATAFORMA DE GESTÃO DA CADEIA DE SUPRIMENTOS</span>
+
           <h1 className="sct-home-greeting">
-            Bem-vindo ao SUPPLY <span>CHAIN TRACKER</span>
+            Bem-vindo ao SUPPLY CHAIN <span className="brand-tracker">TRACKER</span>
           </h1>
+
           <p className="sct-home-instructions">
-            Acompanhe transmissões, engenharia, materiais e etapas de manufatura em um só lugar.
+            Uma plataforma centralizada para monitoramento e controle da nossa cadeia de suprimentos para projetos em tempo real.
           </p>
         </header>
 
@@ -39,27 +41,30 @@ export default function CentralOperacoes({ onOpenSupplyChain, onOpenDatabase, ha
             type="button"
             className="sct-hub-card sct-hub-card--blue"
             onClick={onOpenSupplyChain}
-            aria-label={hasLoadedData ? 'Acessar Supply Chain e continuar acompanhando os dados carregados' : 'Acessar área de Supply Chain'}
+            aria-label={hasLoadedData ? 'Acessar Painel de Monitoramento e continuar acompanhando os dados carregados' : 'Acessar Painel de Monitoramento'}
           >
             <div className="sct-hub-card-topline">
               <div className="sct-hub-card-icon">
-                <Box size={36} strokeWidth={1.8} />
+                <Eye size={36} strokeWidth={1.8} />
               </div>
               {hasLoadedData && <span className="sct-hub-card-status">Base carregada nesta sessão</span>}
             </div>
-            <h2>Área de Supply Chain</h2>
+
+            <h2>Painel de Monitoramento</h2>
             <p>
-              Importe as planilhas dos projetos e acompanhe transmissões, Engenharia, materiais Comerciais e Construtivos e Manufatura.
+              Monitore o status de cada transmissão e acompanhe os detalhes das etapas de engenharia, materiais comerciais, construtivos e manufatura.
             </p>
-            <div className="sct-area-tags" aria-label="Funcionalidades">
+
+            <div className="sct-area-tags" aria-label="Funcionalidades do painel">
               <span className="sct-area-tag">Transmissões</span>
               <span className="sct-area-tag">Engenharia</span>
               <span className="sct-area-tag">Comerciais</span>
               <span className="sct-area-tag">Construtivos</span>
               <span className="sct-area-tag">Manufatura</span>
             </div>
+
             <div className="sct-hub-card-action">
-              Acessar Supply Chain <ArrowRight size={18} className="sct-arrow-transition" />
+              Acessar Painel <ArrowRight size={18} className="sct-arrow-transition" />
             </div>
           </button>
 
@@ -67,32 +72,33 @@ export default function CentralOperacoes({ onOpenSupplyChain, onOpenDatabase, ha
             type="button"
             className="sct-hub-card sct-hub-card--indigo"
             onClick={onOpenDatabase}
-            aria-label="Abrir prévia da área de Banco de Dados"
+            aria-label="Abrir Área do Administrador"
           >
             <div className="sct-hub-card-topline">
               <div className="sct-hub-card-icon">
-                <Database size={36} strokeWidth={1.8} />
+                <Settings size={36} strokeWidth={1.8} />
               </div>
               <span className="sct-hub-card-status sct-hub-card-status--planned">Em desenvolvimento</span>
             </div>
-            <h2>Banco de Dados</h2>
+
+            <h2>Área do Administrador</h2>
             <p>
-              Área destinada à consulta e ao gerenciamento centralizado das informações dos projetos e materiais.
+              Área destinada ao gerenciamento das bases de dados e das funcionalidades do sistema.
             </p>
-            <div className="sct-area-tags" aria-label="Áreas previstas">
-              <span className="sct-area-tag">Projetos</span>
-              <span className="sct-area-tag">Transmissões</span>
-              <span className="sct-area-tag">Materiais</span>
-              <span className="sct-area-tag">Consulta</span>
+
+            <div className="sct-area-tags" aria-label="Funcionalidades administrativas">
+              <span className="sct-area-tag">Base de dados</span>
+              <span className="sct-area-tag">Gestão do sistema</span>
             </div>
+
             <div className="sct-hub-card-action">
-              Visualizar módulo <ArrowRight size={18} className="sct-arrow-transition" />
+              Acessar Administração <ArrowRight size={18} className="sct-arrow-transition" />
             </div>
           </button>
         </section>
 
         <footer className="sct-home-hub-footer">
-          Supply Chain Tracker <span aria-hidden="true">·</span> COMAU
+          Supply Chain <span className="brand-tracker">Tracker</span> <span aria-hidden="true">·</span> COMAU
         </footer>
       </div>
     </div>

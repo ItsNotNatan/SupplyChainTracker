@@ -12,15 +12,15 @@ export default function BancoDeDados({ onBack }) {
         <span className="sct-database-preview-badge">
           <Clock size={14} /> Em desenvolvimento
         </span>
-        <h1>Banco de Dados</h1>
+        <h1>Área do Administrador</h1>
         <p className="sct-database-preview-lead">
-          Este espaço será destinado à consulta e ao gerenciamento centralizado das informações do Supply Chain Tracker.
+          Este espaço será destinado ao gerenciamento das bases de dados e das funcionalidades do Supply Chain <span className="brand-tracker">TRACKER</span>.
         </p>
         <div className="sct-database-preview-note">
-          A conexão com a base de dados e as ferramentas de consulta ainda não estão disponíveis nesta versão.
+          A conexão com as bases de dados e as ferramentas administrativas ainda não estão disponíveis nesta versão.
         </div>
         <button type="button" className="sct-database-preview-back" onClick={onBack}>
-          <ArrowLeft size={17} /> Voltar à central
+          <ArrowLeft size={17} /> Voltar à Página inicial
         </button>
       </div>
     </section>
