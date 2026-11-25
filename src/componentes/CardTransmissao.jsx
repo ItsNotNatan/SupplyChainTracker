@@ -37,8 +37,10 @@ export default function CardTransmissao({ card, onSelect, index = 0 }) {
             <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
           </div>
         </div>
-        <span className="transmission-id" aria-label={`Número da transmissão ${card.id}`}>{card.id}</span>
       </div>
+
+      {/* O nome da transmissão permanece como título, sem o rótulo ID: e sem caixa ao redor. */}
+      <h3 className="card-title transmission-title">{card.id}</h3>
 
       <p className="card-desc"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
 
