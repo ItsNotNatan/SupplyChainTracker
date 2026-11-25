@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   X, Hash, PenTool, Package, Settings, Factory,
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search, RotateCcw
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
@@ -29,6 +29,7 @@ function normalizeFilter(value) {
 
 export default function ModalDetalhes({ card, onClose }) {
   const [activeTab, setActiveTab] = useState('All')
+  const [materialSearch, setMaterialSearch] = useState('')
 
   useEffect(() => {
     const handleKeyDown = event => {
@@ -38,7 +39,10 @@ export default function ModalDetalhes({ card, onClose }) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  useEffect(() => setActiveTab('All'), [card?.id])
+  useEffect(() => {
+    setActiveTab('All')
+    setMaterialSearch('')
+  }, [card?.id])
 
   if (!card) return null
 
@@ -80,6 +84,10 @@ export default function ModalDetalhes({ card, onClose }) {
             constructiveCount={constructiveItems.length}
           />
 
+          {(showAll || showCommercial || showConstructive) && (
+            <MaterialGlobalSearch value={materialSearch} onChange={setMaterialSearch} />
+          )}
+
           <div className="details-grid">
             {showEngineering && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
@@ -106,7 +114,7 @@ export default function ModalDetalhes({ card, onClose }) {
               <section className={`detail-section material-detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={Package} title="Comerciais" status={card.stages?.Comerciais} />
                 {commercialItems.length > 0 ? (
-                  <MaterialListExplorer items={commercialItems} category="commercial" />
+                  <MaterialListExplorer items={commercialItems} category="commercial" searchTerm={materialSearch} />
                 ) : (
                   <EmptyMessage>Nenhum item comercial associado a esta transmissão.</EmptyMessage>
                 )}
@@ -117,7 +125,7 @@ export default function ModalDetalhes({ card, onClose }) {
               <section className={`detail-section material-detail-section ${!showAll ? 'full-width' : ''}`}>
                 <SectionTitle icon={Settings} title="Construtivos" status={card.stages?.Construtivos} />
                 {constructiveItems.length > 0 ? (
-                  <MaterialListExplorer items={constructiveItems} category="constructive" />
+                  <MaterialListExplorer items={constructiveItems} category="constructive" searchTerm={materialSearch} />
                 ) : (
                   <EmptyMessage>Nenhum item construtivo associado a esta transmissão.</EmptyMessage>
                 )}
@@ -247,28 +255,61 @@ function EngineeringSubsection({ title, status, children }) {
   )
 }
 
-function MaterialListExplorer({ items, category }) {
-  const [manufacturerFilter, setManufacturerFilter] = useState('')
-  const [rcFilter, setRcFilter] = useState('')
-  const [poFilter, setPoFilter] = useState('')
+function MaterialGlobalSearch({ value, onChange }) {
+  return (
+    <div className="material-global-search">
+      <label className="material-global-search-field">
+        <Search size={17} aria-hidden="true" />
+        <input
+          type="search"
+          value={value}
+          onChange={event => onChange(event.target.value)}
+          placeholder="Pesquisar em todos os materiais..."
+          aria-label="Pesquisar em todos os materiais"
+        />
+        {value && (
+          <button type="button" onClick={() => onChange('')} aria-label="Limpar pesquisa">
+            <X size={16} />
+          </button>
+        )}
+      </label>
+    </div>
+  )
+}
+
+function collectSearchableValues(value, output = []) {
+  if (value === null || value === undefined) return output
+
+  if (Array.isArray(value)) {
+    value.forEach(item => collectSearchableValues(item, output))
+    return output
+  }
+
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      output.push(key)
+      collectSearchableValues(nestedValue, output)
+    })
+    return output
+  }
+
+  output.push(String(value))
+  return output
+}
+
+function MaterialListExplorer({ items, category, searchTerm }) {
   const [pageSize, setPageSize] = useState(9)
   const [page, setPage] = useState(1)
 
-  const manufacturerOptions = useMemo(() => (
-    Array.from(new Set(items
-      .map(item => String(item.fabricante || item.fornecedor || '').trim())
-      .filter(name => name && !['-', 'nao informado', 'n/a'].includes(normalizeFilter(name)))))
-      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  ), [items])
+  const filteredItems = useMemo(() => {
+    const normalizedTerm = normalizeFilter(searchTerm)
+    if (!normalizedTerm) return items
 
-  const filteredItems = useMemo(() => items.filter(item => {
-    const itemManufacturer = normalizeFilter(item.fabricante || item.fornecedor)
-    const itemRc = normalizeFilter(item.rc)
-    const itemPo = normalizeFilter(item.po)
-    return (!manufacturerFilter || itemManufacturer === normalizeFilter(manufacturerFilter)) &&
-      (!rcFilter || itemRc.includes(normalizeFilter(rcFilter))) &&
-      (!poFilter || itemPo.includes(normalizeFilter(poFilter)))
-  }), [items, manufacturerFilter, rcFilter, poFilter])
+    return items.filter(item => {
+      const searchableText = normalizeFilter(collectSearchableValues(item).join(' '))
+      return searchableText.includes(normalizedTerm)
+    })
+  }, [items, searchTerm])
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -279,75 +320,19 @@ function MaterialListExplorer({ items, category }) {
 
   useEffect(() => {
     setPage(1)
-  }, [manufacturerFilter, rcFilter, poFilter, pageSize, items])
+  }, [searchTerm, pageSize, items])
 
-  const hasFilters = Boolean(manufacturerFilter || rcFilter || poFilter)
   const pageStart = Math.max(1, Math.min(safePage - 2, totalPages - 4))
   const pageEnd = Math.min(totalPages, pageStart + 4)
   const pageNumbers = Array.from({ length: pageEnd - pageStart + 1 }, (_, index) => pageStart + index)
 
   return (
     <div className="material-list-browser">
-      <div className="material-filter-panel" aria-label="Filtros dos materiais">
-        <div className="material-filter-heading">
-          <div>
-            <strong>Filtrar materiais</strong>
-            <span>Fabricante, número da RC e número da PO</span>
-          </div>
-          {hasFilters && (
-            <button
-              type="button"
-              className="material-filter-reset"
-              onClick={() => {
-                setManufacturerFilter('')
-                setRcFilter('')
-                setPoFilter('')
-              }}
-            >
-              <RotateCcw size={13} /> Limpar filtros
-            </button>
-          )}
-        </div>
-
-        <div className="material-filters-grid">
-          <label className="material-filter-field">
-            <span>{category === 'commercial' ? 'Fabricante' : 'Construtivos'}</span>
-            <select value={manufacturerFilter} onChange={event => setManufacturerFilter(event.target.value)}>
-              <option value="">Todos</option>
-              {manufacturerOptions.map(name => <option key={name} value={name}>{name}</option>)}
-            </select>
-          </label>
-
-          <label className="material-filter-field">
-            <span>Nº da RC</span>
-            <div className="material-filter-input-wrap">
-              <Search size={14} />
-              <input
-                type="search"
-                placeholder="Buscar RC"
-                value={rcFilter}
-                onChange={event => setRcFilter(event.target.value)}
-              />
-            </div>
-          </label>
-
-          <label className="material-filter-field">
-            <span>Nº da PO</span>
-            <div className="material-filter-input-wrap">
-              <Search size={14} />
-              <input
-                type="search"
-                placeholder="Buscar PO"
-                value={poFilter}
-                onChange={event => setPoFilter(event.target.value)}
-              />
-            </div>
-          </label>
-        </div>
-      </div>
-
       <div className="material-list-summary">
-        <span>{filteredItems.length} {filteredItems.length === 1 ? 'material encontrado' : 'materiais encontrados'}</span>
+        <span>
+          {filteredItems.length} {filteredItems.length === 1 ? 'material encontrado' : 'materiais encontrados'}
+          {searchTerm ? ' nesta pesquisa' : ''}
+        </span>
         <label>
           Itens por página
           <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>
@@ -365,8 +350,8 @@ function MaterialListExplorer({ items, category }) {
       ) : (
         <EmptyMessage>
           {items.length === 0
-            ? 'Nenhum material cadastrado nesta categoria.'
-            : 'Nenhum material corresponde aos filtros selecionados.'}
+            ? `Nenhum material ${category === 'commercial' ? 'comercial' : 'construtivo'} associado a esta transmissão.`
+            : 'Nenhum material corresponde à palavra-chave pesquisada.'}
         </EmptyMessage>
       )}
 

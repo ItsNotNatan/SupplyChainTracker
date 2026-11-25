@@ -1445,118 +1445,66 @@ body {
   min-width: 0;
 }
 
-.material-filter-panel {
-  margin: 0 0 .75rem;
-  padding: .75rem;
-  border: 1px solid var(--border-mid);
+.material-global-search {
+  width: 100%;
+  margin: 0 0 .9rem;
+}
+
+.material-global-search-field {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0 .8rem;
+  border: 1.5px solid var(--border-mid);
   border-radius: var(--radius-md);
-  background: var(--surface-2);
-}
-
-.material-filter-heading,
-.material-list-summary,
-.material-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .75rem;
-}
-
-.material-filter-heading {
-  margin-bottom: .65rem;
-}
-
-.material-filter-heading > div {
-  display: flex;
-  flex-direction: column;
-  gap: .12rem;
-}
-
-.material-filter-heading strong {
-  color: var(--text-main);
-  font-size: .72rem;
-  font-weight: 800;
-}
-
-.material-filter-heading span,
-.material-list-summary,
-.material-pagination-range {
-  color: var(--text-muted);
-  font-size: .64rem;
-}
-
-.material-filter-reset {
-  display: inline-flex;
-  align-items: center;
-  gap: .3rem;
-  padding: .35rem .5rem;
-  border: 1px solid var(--border-mid);
-  border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text-sub);
+  color: var(--text-muted);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.material-global-search-field:focus-within {
+  border-color: var(--cyan-mid);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
+}
+
+.material-global-search-field > svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.material-global-search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main);
   font: inherit;
-  font-size: .63rem;
-  font-weight: 700;
+  font-size: .78rem;
+}
+
+.material-global-search-field input::placeholder {
+  color: var(--text-muted);
+}
+
+.material-global-search-field button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
-.material-filter-reset:hover {
-  border-color: var(--cyan-mid);
-  color: var(--cyan-mid);
-}
-
-.material-filters-grid {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
-  gap: .6rem;
-}
-
-.material-filter-field {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: .25rem;
-  color: var(--text-sub);
-  font-size: .62rem;
-  font-weight: 700;
-}
-
-.material-filter-field select,
-.material-filter-input-wrap input {
-  width: 100%;
-  min-width: 0;
-  min-height: 2.2rem;
-  padding: .4rem .55rem;
-  border: 1px solid var(--border-mid);
-  border-radius: var(--radius-sm);
-  outline: none;
-  background: var(--surface);
+.material-global-search-field button:hover {
+  background: var(--surface-3);
   color: var(--text-main);
-  font: inherit;
-  font-size: .68rem;
-}
-
-.material-filter-field select:focus,
-.material-filter-input-wrap input:focus {
-  border-color: var(--cyan-mid);
-  box-shadow: 0 0 0 2px var(--cyan-glow);
-}
-
-.material-filter-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.material-filter-input-wrap > svg {
-  position: absolute;
-  left: .55rem;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.material-filter-input-wrap input {
-  padding-left: 1.8rem;
 }
 
 .material-list-summary {
@@ -1762,8 +1710,6 @@ body {
 }
 
 @media (max-width: 768px) {
-  .material-filters-grid { grid-template-columns: 1fr 1fr; }
-  .material-filter-field:first-child { grid-column: 1 / -1; }
   .keyword-filter { flex-basis: 100%; min-width: 100%; }
   .filter-select { min-width: calc(33.333% - .5rem); }
   .cards-result-count { padding: .5rem .875rem 0; }
@@ -1778,9 +1724,6 @@ body {
 
 @media (max-width: 640px) {
   .material-list { grid-template-columns: 1fr; }
-  .material-filters-grid { grid-template-columns: 1fr; }
-  .material-filter-field:first-child { grid-column: auto; }
-  .material-filter-heading { align-items: flex-start; flex-direction: column; }
   .material-pagination { align-items: flex-start; flex-direction: column; }
   .material-pagination-buttons { flex-wrap: wrap; }
 }
