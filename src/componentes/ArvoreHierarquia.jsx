@@ -15,20 +15,23 @@ export default function ArvoreHierarquia({ stages = {}, activeTab, onTabChange }
         const theme = getTheme(stages[key])
         const StatusIcon = theme.Icon
         const active = activeTab === key
+        const showStatus = key !== 'Engenharia'
         return (
           <button
             key={key}
             type="button"
-            className={`step ${theme.c} ${active ? 'active' : ''}`}
+            className={`step ${showStatus ? theme.c : 'engineering-no-overall-status'} ${active ? 'active' : ''}`}
             onClick={() => onTabChange(active ? 'All' : key)}
-            title={`${label}: ${theme.t}. Clique para filtrar esta classe.`}
+            title={`${label}${showStatus ? `: ${theme.t}` : ''}. Clique para filtrar esta classe.`}
             aria-pressed={active}
           >
             <span className="step-icon-wrapper"><Icon className="icon-md" /></span>
             <span className="step-label">{label}</span>
-            <span className="step-status-icon" aria-label={`Status: ${theme.t}`}>
-              <StatusIcon className="icon-sm" />
-            </span>
+            {showStatus && (
+              <span className="step-status-icon" aria-label={`Status: ${theme.t}`}>
+                <StatusIcon className="icon-sm" />
+              </span>
+            )}
           </button>
         )
       })}

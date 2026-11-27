@@ -23,8 +23,119 @@ const EXTRA_DATES = [
   { key: 'entregaUsuario', label: 'Entrega ao usuário', aliases: ['data de entrega ao usuario', 'entrega ao usuario', 'user delivery', 'delivery to user'] }
 ]
 
+// Entregáveis de Engenharia: as datas são lidas das colunas Plan/Prev/Real
+// quando esses campos existirem nas planilhas de Follow up ou PCP.
+const ENGINEERING_DELIVERABLES = {
+  mecanica: [
+    { key: 'desenho3D', label: 'Desenho 3D', aliases: ['desenho 3d', 'projeto 3d'], valueAliases: ['desenho 3d', 'projeto 3d'] },
+    { key: 'desenho2D', label: 'Desenho 2D', aliases: ['desenho 2d', 'projeto 2d'], valueAliases: ['desenho 2d', 'projeto 2d'] },
+    { key: 'listaMateriaisMecanicos', label: 'Lista de materiais mecânicos', aliases: ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'], valueAliases: ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'] }
+  ],
+  controls: [
+    { key: 'projetoEletrico', label: 'Projeto elétrico', aliases: ['projeto eletrico', 'proj ele'], valueAliases: ['projeto eletrico', 'proj ele'] },
+    { key: 'listaMateriaisControls', label: 'Lista de materiais de controls', aliases: ['lista de materiais de control', 'lista de materiais de controls', 'lista materiais controls'], valueAliases: ['lista de materiais de control', 'lista de materiais de controls', 'lista materiais controls'] },
+    { key: 'topografico', label: 'Topográfico', aliases: ['topografico', 'projeto topografico', 'proj top'], valueAliases: ['topografico', 'projeto topografico', 'proj top'] },
+    { key: 'listaIdentificacoes', label: 'Lista de identificações', aliases: ['lista de identificacoes', 'lista identificacoes'], valueAliases: ['lista de identificacoes', 'lista identificacoes'] },
+    { key: 'layoutCalhas', label: 'Layout de calhas', aliases: ['layout de calhas', 'layout de calha', 'layout calha'], valueAliases: ['layout de calhas', 'layout de calha', 'layout calha'] }
+  ]
+}
+
+const ENGINEERING_EMPTY_TRIPLE = () => ({ planejado: null, previsto: null, realizado: null })
+
+function createEmptyEngineeringDeliverable() {
+  return { valor: '', datas: ENGINEERING_EMPTY_TRIPLE(), link: '' }
+}
+
+function createEngineeringStructure() {
+  return {
+    mecanica: Object.fromEntries(ENGINEERING_DELIVERABLES.mecanica.map(item => [item.key, createEmptyEngineeringDeliverable()])),
+    controls: Object.fromEntries(ENGINEERING_DELIVERABLES.controls.map(item => [item.key, createEmptyEngineeringDeliverable()]))
+  }
+}
+
+function normalizeEngineeringLink(value) {
+  if (value && typeof value === 'object') {
+    value = value.Target || value.target || value.href || value.url || value.uri || value.link || ''
+  }
+  const text = String(value ?? '').trim()
+  if (!text) return ''
+
+  const formulaUrl = text.match(/HYPERLINK\s*\(\s*["']([^"']+)["']/i)?.[1]
+  const candidate = String(formulaUrl || text).trim()
+  if (/^https?:\/\//i.test(candidate)) return candidate
+  if (/^\/\//.test(candidate)) return `https:${candidate}`
+  return ''
+}
+
+function readEngineeringLink(row, headerInfo, milestoneAliases = []) {
+  const headers = headerInfo?.headers ?? []
+  const aliases = milestoneAliases.map(normalizeText).filter(Boolean)
+  const linkIndex = headers.findIndex(header => (
+    aliases.some(alias => header.includes(alias)) && /\b(link|url|hiperlink|hyperlink|arquivo|documento)\b/.test(header)
+  ))
+  if (linkIndex >= 0) return normalizeEngineeringLink(row?.[linkIndex])
+
+  // Algumas bases colocam o próprio endereço na coluna do entregável, sem
+  // uma coluna adicional chamada Link/URL. Só aceita endereços http(s).
+  const directValueIndex = findColumn(headers, milestoneAliases, ['plan', 'prev', 'real', 'link', 'url'])
+  return directValueIndex >= 0 ? normalizeEngineeringLink(row?.[directValueIndex]) : ''
+}
+
+function readEngineeringValue(row, headerInfo, aliases = [], fallback = -1) {
+  const headers = headerInfo?.headers ?? []
+  const excluded = ['plan', 'prev', 'real', 'link', 'url', 'hiperlink', 'hyperlink']
+  const index = findColumn(headers, aliases, excluded)
+  if (index >= 0 && hasValue(row?.[index])) return String(unwrapCellValue(row[index])).trim()
+
+  // Fallback por posição só é usado quando a coluna não é uma data nem um link.
+  if (Number.isInteger(fallback) && fallback >= 0 && hasValue(row?.[fallback])) {
+    const fallbackHeader = normalizeText(headers[fallback] || '')
+    const isDateOrLinkColumn = excluded.some(term => fallbackHeader.includes(term))
+    if (!isDateOrLinkColumn) return String(unwrapCellValue(row[fallback])).trim()
+  }
+
+  // Também aceita um valor já lido de um campo legado (ex.: PCP/Folow-up).
+  if (!Number.isInteger(fallback) && hasValue(fallback)) {
+    return String(unwrapCellValue(fallback)).trim()
+  }
+
+  return ''
+}
+
+function mergeEngineeringDeliverable(target, key, incoming) {
+  const previous = target[key] || createEmptyEngineeringDeliverable()
+  const incomingDates = incoming?.datas || {}
+  const previousDates = previous.datas || ENGINEERING_EMPTY_TRIPLE()
+  const mergedDates = {
+    planejado: incomingDates.planejado || previousDates.planejado || null,
+    previsto: incomingDates.previsto || previousDates.previsto || null,
+    realizado: incomingDates.realizado || previousDates.realizado || null
+  }
+
+  target[key] = {
+    valor: hasValue(incoming?.valor) && !isPlaceholder(incoming.valor) ? incoming.valor : previous.valor,
+    datas: mergedDates,
+    link: incoming?.link || previous.link || ''
+  }
+}
+
+function readEngineeringDeliverable(row, headerInfo, config, fallbackValue = '') {
+  return {
+    valor: readEngineeringValue(row, headerInfo, config.valueAliases, fallbackValue),
+    datas: readDateTriple(row, headerInfo, config.aliases),
+    link: readEngineeringLink(row, headerInfo, config.aliases)
+  }
+}
+
+function unwrapCellValue(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value.value ?? value.text ?? value.displayValue ?? ''
+  }
+  return value
+}
+
 function normalizeText(value) {
-  return String(value ?? '')
+  return String(unwrapCellValue(value) ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -33,7 +144,8 @@ function normalizeText(value) {
 }
 
 function hasValue(value) {
-  return value !== undefined && value !== null && String(value).trim() !== ''
+  const unwrapped = unwrapCellValue(value)
+  return unwrapped !== undefined && unwrapped !== null && String(unwrapped).trim() !== ''
 }
 
 function isPlaceholder(value) {
@@ -117,12 +229,13 @@ function findColumn(headers, aliases = [], excluded = []) {
 
 function readField(row, headerInfo, aliases, fallbackIndex = -1) {
   const index = findColumn(headerInfo?.headers ?? [], aliases)
-  if (index >= 0 && hasValue(row?.[index])) return row[index]
-  if (fallbackIndex >= 0 && hasValue(row?.[fallbackIndex])) return row[fallbackIndex]
+  if (index >= 0 && hasValue(row?.[index])) return unwrapCellValue(row[index])
+  if (fallbackIndex >= 0 && hasValue(row?.[fallbackIndex])) return unwrapCellValue(row[fallbackIndex])
   return null
 }
 
 function readDate(value) {
+  value = unwrapCellValue(value)
   if (!hasValue(value)) return null
   const date = excelToJSDate(value)
   return date && !Number.isNaN(date.getTime()) ? date : null
@@ -255,6 +368,7 @@ export function processarDados(sheets = {}) {
         descricao: 'S/ Descrição',
         qtd: 1,
         construtivo: null,
+        engenharia: createEngineeringStructure(),
         manufatura: { estrategia: '', montagemMecanica: '', medicao3D: '', bordoMaquina: '', inspecaoQualidade: '', entregaDispositivo: EMPTY_TRIPLE() },
         riscoFornecedor: { saturacaoPerc: 0, nota: 'N/A' },
         pcp: null,
@@ -294,14 +408,14 @@ export function processarDados(sheets = {}) {
     const deliveryTriple = readDateTriple(row, boardInfo, ['entrega do dispositivo', 'entrega dispositivo', 'data entrega dispositivo', 'device delivery', 'delivery of device'])
     if (!deliveryTriple.realizado) deliveryTriple.realizado = deliveryDate
 
-    const projectElectrical = readField(row, boardInfo, ['projeto eletrico', 'proj ele'], 6)
-    const projectTopographic = readField(row, boardInfo, ['topografico', 'projeto topografico', 'proj top'], 8)
+    const projectElectrical = readEngineeringValue(row, boardInfo, ['projeto eletrico', 'proj ele'], 6)
+    const projectTopographic = readEngineeringValue(row, boardInfo, ['topografico', 'projeto topografico', 'proj top'], 8)
     const materialElectrical = readField(row, boardInfo, ['material eletrico', 'mat ele'], 9)
     const materialPneumatic = readField(row, boardInfo, ['material pneumatica', 'material pneumatico', 'mat pneu'], 10)
     const tests = readField(row, boardInfo, ['inspecao da qualidade', 'inspecao qualidade', 'status testes', 'testes'], 15)
 
-    const listMaterialsMechanical = readField(row, boardInfo, ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'])
-    const listMaterialsControls = readField(row, boardInfo, ['lista de materiais de control', 'lista de materiais de controls', 'lista materiais controls', 'lista de materiais controls'])
+    const listMaterialsMechanical = readEngineeringValue(row, boardInfo, ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'])
+    const listMaterialsControls = readEngineeringValue(row, boardInfo, ['lista de materiais de control', 'lista de materiais de controls', 'lista materiais controls', 'lista de materiais controls'])
 
     card.pcp = {
       dataEntrega: deliveryDate,
@@ -318,13 +432,38 @@ export function processarDados(sheets = {}) {
       obsPcp: readField(row, boardInfo, ['observacao', 'obs'], 16) || '',
       listaMatMec: listMaterialsMechanical || 'Não mapeado',
       listaMatControls: listMaterialsControls || 'Não mapeado',
-      listaIdent: readField(row, boardInfo, ['lista de identificacoes', 'lista identificacoes'], -1) || 'Não mapeado',
-      layoutCalha: readField(row, boardInfo, ['layout de calha', 'layout calha'], -1) || 'Não mapeado',
+      listaIdent: readEngineeringValue(row, boardInfo, ['lista de identificacoes', 'lista identificacoes']) || 'Não mapeado',
+      layoutCalha: readEngineeringValue(row, boardInfo, ['layout de calhas', 'layout de calha', 'layout calha']) || 'Não mapeado',
       montagemMecanica: readField(row, boardInfo, ['montagem mecanica', 'mechanical assembly'], -1) || '',
       medicao3D: readField(row, boardInfo, ['medicao 3d', 'medicao tridimensional', '3d measurement'], -1) || '',
       bordoMaquina: readField(row, boardInfo, ['bordo maquina', 'status bordo maquina'], -1) || 'Não mapeado',
       entregaDispositivo: deliveryTriple
     }
+
+    // Entregáveis de Controls: lê os dados do PCP Manufacturing.
+    ENGINEERING_DELIVERABLES.controls.forEach(config => {
+      const fallbackMap = {
+        projetoEletrico: card.pcp.projEle,
+        listaMateriaisControls: card.pcp.listaMatControls,
+        topografico: card.pcp.projTop,
+        listaIdentificacoes: card.pcp.listaIdent,
+        layoutCalhas: card.pcp.layoutCalha
+      }
+      mergeEngineeringDeliverable(
+        card.engenharia.controls,
+        config.key,
+        readEngineeringDeliverable(row, boardInfo, config, fallbackMap[config.key])
+      )
+    })
+
+    // A lista de materiais mecânicos também pode estar no PCP.
+    const pcpMechanicalList = readEngineeringDeliverable(
+      row,
+      boardInfo,
+      ENGINEERING_DELIVERABLES.mecanica[2],
+      card.pcp.listaMatMec
+    )
+    mergeEngineeringDeliverable(card.engenharia.mecanica, 'listaMateriaisMecanicos', pcpMechanicalList)
 
     card.manufatura.inspecaoQualidade = String(card.pcp.inspecaoQualidade || '').trim()
     card.manufatura.montagemMecanica = String(card.pcp.montagemMecanica || '').trim()
@@ -381,17 +520,33 @@ export function processarDados(sheets = {}) {
       status: readField(row, followInfo, ['status liberacao', 'status'], 21) || '-',
       localEnt: readField(row, followInfo, ['local montagem', 'local entrega', 'local'], 22) || '-',
       obs: readField(row, followInfo, ['observacao', 'observacoes', 'obs'], 7) || '',
-      des2D: readField(row, followInfo, ['desenho 2d', 'projeto 2d'], 24) || 'Não mapeado',
-      des3D: readField(row, followInfo, ['desenho 3d', 'projeto 3d'], 25) || 'Não mapeado',
+      des2D: readEngineeringValue(row, followInfo, ['desenho 2d', 'projeto 2d'], 24) || 'Não mapeado',
+      des3D: readEngineeringValue(row, followInfo, ['desenho 3d', 'projeto 3d'], 25) || 'Não mapeado',
       dtNecessidade: readDate(readField(row, followInfo, ['data necessidade', 'dt necessidade'], 27)),
       rc: String(readField(row, followInfo, ['numero da rc', 'n da rc', 'rc'], 35) ?? '').trim(),
       dtRc: readDate(readField(row, followInfo, ['data rc', 'dt rc', 'emissao rc'], 36)),
       oc: String(readField(row, followInfo, ['numero da po', 'n da po', 'po', 'oc'], 37) ?? '').trim(),
       dtOc: readDate(readField(row, followInfo, ['data po', 'data pedido', 'dt po', 'dt oc'], 38))
     }
+
+    // Entregáveis de Mecânica: mantém o valor já usado pelo Follow up e lê
+    // datas Planejado/Previsto/Realizado e links quando as colunas existirem.
+    ENGINEERING_DELIVERABLES.mecanica.forEach(config => {
+      const fallbackValue = config.key === 'desenho3D'
+        ? card.construtivo.des3D
+        : config.key === 'desenho2D'
+          ? card.construtivo.des2D
+          : (card.construtivo.listaMatMec || '')
+      mergeEngineeringDeliverable(
+        card.engenharia.mecanica,
+        config.key,
+        readEngineeringDeliverable(row, followInfo, config, fallbackValue)
+      )
+    })
+
     card.riscoFornecedor = risk
 
-    const mechanicalList = readField(row, followInfo, ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'], -1)
+    const mechanicalList = readEngineeringValue(row, followInfo, ['lista de materiais mecanicos', 'lista materiais mecanicos', 'bom mecanica'])
     if (hasValue(mechanicalList)) card.construtivo.listaMatMec = mechanicalList
 
     const mechanicalAssembly = readField(row, followInfo, ['montagem mecanica', 'mechanical assembly'], -1)

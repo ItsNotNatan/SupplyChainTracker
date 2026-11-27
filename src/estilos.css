@@ -2280,3 +2280,100 @@ body {
 .engineering-subsection-title .ongoing {
   color: #ca8a04;
 }
+
+
+/* =========================================================
+   TÓPICO 5 — CRONOGRAMAS DOS ENTREGÁVEIS DE ENGENHARIA
+========================================================= */
+.engineering-date-table-block {
+  margin-top: .5rem;
+}
+
+.engineering-schedule-table {
+  min-width: 560px;
+  table-layout: auto;
+}
+
+.engineering-schedule-table thead th:first-child {
+  min-width: 195px;
+  text-align: left;
+}
+
+.engineering-schedule-table thead th:last-child,
+.engineering-schedule-table tbody td:last-child {
+  width: 48px;
+  min-width: 48px;
+  text-align: center;
+}
+
+.engineering-deliverable-label {
+  align-items: flex-start;
+  gap: .42rem;
+}
+
+.engineering-deliverable-label .milestone-status-dot {
+  margin-top: .12rem;
+}
+
+.engineering-deliverable-copy {
+  display: inline-flex;
+  flex-direction: column;
+  gap: .12rem;
+  white-space: normal;
+}
+
+.engineering-deliverable-copy small {
+  color: var(--text-muted);
+  font-size: .58rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.engineering-link-cell {
+  text-align: center;
+}
+
+.engineering-deliverable-link {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-mid);
+  border-radius: .35rem;
+  background: var(--surface);
+  color: var(--cyan-mid);
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.engineering-deliverable-link[href]:hover {
+  border-color: var(--cyan-mid);
+  background: var(--cyan-dim);
+  color: var(--cyan);
+}
+
+.engineering-deliverable-link.is-unavailable {
+  color: var(--text-muted);
+  background: var(--surface-3);
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .engineering-schedule-table {
+    min-width: 520px;
+  }
+}
+
+
+/* A Engenharia não possui semáforo geral: somente seus entregáveis são sinalizados. */
+.step.engineering-no-overall-status .step-icon-wrapper {
+  border-color: var(--border-hi);
+  background: var(--surface);
+  color: var(--text-sub);
+}
+
+.step.engineering-no-overall-status .step-label {
+  color: var(--text-sub);
+}

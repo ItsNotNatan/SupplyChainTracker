@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   X, Hash, PenTool, Package, Settings, Factory,
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Search, Link2
 } from 'lucide-react'
 import { getTheme, formatDate } from '../utils/formatadores.js'
 import ArvoreHierarquia from './ArvoreHierarquia.jsx'
@@ -16,6 +16,21 @@ const MATERIAL_MILESTONES = [
   { key: 'criacaoPS', label: 'Criação do P&S' },
   { key: 'entregaUsuario', label: 'Entrega ao usuário' }
 ]
+
+const ENGINEERING_MILESTONES = {
+  mecanica: [
+    { key: 'desenho3D', label: 'Desenho 3D' },
+    { key: 'desenho2D', label: 'Desenho 2D' },
+    { key: 'listaMateriaisMecanicos', label: 'Lista de materiais mecânicos' }
+  ],
+  controls: [
+    { key: 'projetoEletrico', label: 'Projeto elétrico' },
+    { key: 'listaMateriaisControls', label: 'Lista de materiais de controls' },
+    { key: 'topografico', label: 'Topográfico' },
+    { key: 'listaIdentificacoes', label: 'Lista de identificações' },
+    { key: 'layoutCalhas', label: 'Layout de calhas' }
+  ]
+}
 
 const PAGE_SIZE_OPTIONS = [3, 6, 9, 12, 24]
 
@@ -85,20 +100,20 @@ export default function ModalDetalhes({ card, onClose }) {
           <div className="details-grid">
             {showEngineering && (
               <section className={`detail-section ${!showAll ? 'full-width' : ''}`}>
-                <SectionTitle icon={PenTool} title="Engenharia" status={card.stages?.Engenharia} />
+                <SectionTitle icon={PenTool} title="Engenharia" showStatus={false} />
                 <div className="engineering-subgrid">
-                  <EngineeringSubsection title="Mecânica" status={card.subStages?.EngMecanica}>
-                    <InfoRow label="Desenho 3D" value={card.construtivo?.des3D || 'Não mapeado'} badge />
-                    <InfoRow label="Desenho 2D" value={card.construtivo?.des2D || 'Não mapeado'} badge />
-                    <InfoRow label="Lista de materiais mecânicos" value={card.pcp?.listaMatMec && card.pcp.listaMatMec !== 'Não mapeado' ? card.pcp.listaMatMec : (card.construtivo?.listaMatMec || 'Não mapeado')} badge />
+                  <EngineeringSubsection title="Mecânica">
+                    <EngineeringScheduleTable
+                      deliverables={card.engenharia?.mecanica}
+                      milestones={ENGINEERING_MILESTONES.mecanica}
+                    />
                   </EngineeringSubsection>
 
-                  <EngineeringSubsection title="Controls" status={card.subStages?.EngControls}>
-                    <InfoRow label="Projeto elétrico" value={card.pcp?.projEle || 'Não mapeado'} badge />
-                    <InfoRow label="Lista de materiais de control" value={card.pcp?.listaMatControls || 'Não mapeado'} badge />
-                    <InfoRow label="Topográfico" value={card.pcp?.projTop || 'Não mapeado'} badge />
-                    <InfoRow label="Lista de identificações" value={card.pcp?.listaIdent || 'Não mapeado'} badge />
-                    <InfoRow label="Layout de calha" value={card.pcp?.layoutCalha || 'Não mapeado'} badge />
+                  <EngineeringSubsection title="Controls">
+                    <EngineeringScheduleTable
+                      deliverables={card.engenharia?.controls}
+                      milestones={ENGINEERING_MILESTONES.controls}
+                    />
                   </EngineeringSubsection>
                 </div>
               </section>
@@ -159,30 +174,115 @@ export default function ModalDetalhes({ card, onClose }) {
 }
 
 
-function SectionTitle({ icon: Icon, title, status }) {
+function SectionTitle({ icon: Icon, title, status, showStatus = true }) {
   const theme = getTheme(status)
   const StatusIcon = theme.Icon
   return (
     <h3 className="detail-section-title">
       <Icon className="icon-sm" />
       <span>{title}</span>
-      <span className={`section-status ${theme.c}`} title={`Status: ${theme.t}`} aria-label={`Status: ${theme.t}`}>
-        <StatusIcon className="icon-sm" />
-      </span>
+      {showStatus && (
+        <span className={`section-status ${theme.c}`} title={`Status: ${theme.t}`} aria-label={`Status: ${theme.t}`}>
+          <StatusIcon className="icon-sm" />
+        </span>
+      )}
     </h3>
   )
 }
 
-function EngineeringSubsection({ title, status, children }) {
-  const theme = getTheme(status)
-  const StatusIcon = theme.Icon
+function EngineeringSubsection({ title, children }) {
   return (
     <div className="engineering-subsection">
       <div className="engineering-subsection-title">
         <span>{title}</span>
-        <StatusIcon className={`icon-sm ${theme.c}`} title={`Status: ${theme.t}`} />
       </div>
       {children}
+    </div>
+  )
+}
+
+function EngineeringScheduleTable({ deliverables = {}, milestones = [] }) {
+  if (!milestones.length) return null
+
+  const hasAnyDate = milestones.some(({ key }) => {
+    const dates = deliverables?.[key]?.datas || {}
+    return dates.planejado || dates.previsto || dates.realizado
+  })
+
+  return (
+    <div className="date-table-block engineering-date-table-block">
+      <div className="date-table-heading">Cronograma de acompanhamento</div>
+      <div className="date-table-scroll">
+        <table className="date-table engineering-schedule-table">
+          <thead>
+            <tr>
+              <th>Marco</th>
+              <th>Planejado</th>
+              <th>Previsto</th>
+              <th>Realizado</th>
+              <th aria-label="Arquivo do entregável">Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            {milestones.map(({ key, label }) => {
+              const deliverable = deliverables?.[key] || {}
+              const dates = deliverable.datas || {}
+              const status = getMilestoneScheduleStatus(dates)
+              const safeLink = /^https?:\/\//i.test(String(deliverable.link || '').trim())
+                ? String(deliverable.link).trim()
+                : ''
+
+              return (
+                <tr key={key}>
+                  <th scope="row">
+                    <span className="date-milestone-label engineering-deliverable-label">
+                      <span
+                        className={`milestone-status-dot ${status.code}`}
+                        title={status.label}
+                        aria-label={status.label}
+                      />
+                      <span className="engineering-deliverable-copy">
+                        <span>{label}</span>
+                        {deliverable.valor && deliverable.valor !== 'Não mapeado' && deliverable.valor !== '-' && (
+                          <small>{deliverable.valor}</small>
+                        )}
+                      </span>
+                    </span>
+                  </th>
+                  <td>{formatDate(dates.planejado)}</td>
+                  <td>{formatDate(dates.previsto)}</td>
+                  <td>{formatDate(dates.realizado)}</td>
+                  <td className="engineering-link-cell">
+                    {safeLink ? (
+                      <a
+                        className="engineering-deliverable-link"
+                        href={safeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Abrir arquivo de ${label}`}
+                        title={`Abrir arquivo de ${label}`}
+                      >
+                        <Link2 size={15} />
+                      </a>
+                    ) : (
+                      <span
+                        className="engineering-deliverable-link is-unavailable"
+                        aria-disabled="true"
+                        title="Link ainda não disponível na base importada"
+                      >
+                        <Link2 size={15} />
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!hasAnyDate && (
+        <p className="date-table-note">Datas dos entregáveis ainda não disponíveis na base importada.</p>
+      )}
     </div>
   )
 }

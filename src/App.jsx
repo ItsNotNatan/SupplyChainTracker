@@ -69,7 +69,7 @@ export default function App() {
           const lower = sheetName.toLowerCase()
           if (lower.includes('bkp') || lower.includes('cópia') || lower.includes('copia') || lower.includes('backup')) return
 
-          const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' })
+          const data = sheetToDataWithLinks(workbook.Sheets[sheetName])
           const normalizedTab = lower.replace(/[_-]+/g, ' ')
 
           if (normalizedTab.includes('sourcing plan') || normalizedTab.includes('sourcingplan') || sheetName === fallbackSourcingTab) {
@@ -191,6 +191,29 @@ export default function App() {
       )}
     </>
   )
+}
+
+function sheetToDataWithLinks(sheet) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  if (!sheet?.['!ref']) return rows
+
+  const range = XLSX.utils.decode_range(sheet['!ref'])
+  rows.forEach((row, rowIndex) => {
+    if (!Array.isArray(row)) return
+    row.forEach((cellValue, columnIndex) => {
+      const address = XLSX.utils.encode_cell({
+        r: range.s.r + rowIndex,
+        c: range.s.c + columnIndex
+      })
+      const sourceCell = sheet[address]
+      const linkTarget = sourceCell?.l?.Target || sourceCell?.l?.target || sourceCell?.l?.Href || sourceCell?.l?.href
+      if (linkTarget && /^https?:\/\//i.test(String(linkTarget).trim())) {
+        row[columnIndex] = { value: cellValue, link: String(linkTarget).trim() }
+      }
+    })
+  })
+
+  return rows
 }
 
 function readExcel(file) {
