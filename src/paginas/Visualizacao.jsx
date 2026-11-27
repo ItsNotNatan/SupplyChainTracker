@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Filter, SearchX, ChevronDown, Search } from 'lucide-react'
+import { Filter, SearchX, ChevronDown, Search, Folder, GitBranch, Hash } from 'lucide-react'
 import CardTransmissao from '../componentes/CardTransmissao.jsx'
 import FiltroMultiplo from '../componentes/FiltroMultiplo.jsx'
 import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
@@ -63,6 +63,63 @@ function getSearchText(card) {
   ].filter(Boolean).join(' '))
 }
 
+function toSelectionArray(value) {
+  if (Array.isArray(value)) return value.map(normalizeSearch)
+  return value ? [normalizeSearch(value)] : []
+}
+
+function compareLabels(a, b) {
+  return a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
+}
+
+/**
+ * Organiza as transmissões em uma hierarquia Projeto > Linha > Operação.
+ * A chave normalizada evita grupos duplicados apenas por diferença de caixa/acentos.
+ */
+function groupByProjectLineOperation(cards) {
+  const projects = new Map()
+
+  cards.forEach(card => {
+    const projectLabel = String(card.projeto || 'Projeto não informado').trim()
+    const lineLabel = String(card.linha || 'Linha não informada').trim()
+    const operationLabel = String(card.operacao || 'Operação não informada').trim()
+
+    const projectKey = normalizeSearch(projectLabel) || '__projeto_sem_nome__'
+    const lineKey = normalizeSearch(lineLabel) || '__linha_sem_nome__'
+    const operationKey = normalizeSearch(operationLabel) || '__operacao_sem_nome__'
+
+    if (!projects.has(projectKey)) {
+      projects.set(projectKey, { key: projectKey, label: projectLabel, lines: new Map(), count: 0 })
+    }
+    const project = projects.get(projectKey)
+    project.count += 1
+
+    if (!project.lines.has(lineKey)) {
+      project.lines.set(lineKey, { key: lineKey, label: lineLabel, operations: new Map(), count: 0 })
+    }
+    const line = project.lines.get(lineKey)
+    line.count += 1
+
+    if (!line.operations.has(operationKey)) {
+      line.operations.set(operationKey, { key: operationKey, label: operationLabel, cards: [] })
+    }
+    line.operations.get(operationKey).cards.push(card)
+  })
+
+  return Array.from(projects.values())
+    .sort((a, b) => compareLabels(a.label, b.label))
+    .map(project => ({
+      ...project,
+      lines: Array.from(project.lines.values())
+        .sort((a, b) => compareLabels(a.label, b.label))
+        .map(line => ({
+          ...line,
+          operations: Array.from(line.operations.values())
+            .sort((a, b) => compareLabels(a.label, b.label))
+        }))
+    }))
+}
+
 export default function Visualizacao({
   processedData,
   filters,
@@ -78,11 +135,12 @@ export default function Visualizacao({
 
   const filtered = useMemo(() => {
     const keyword = normalizeSearch(filters.palavraChave)
+    const selectedProjects = toSelectionArray(filters.projeto)
+    const selectedLines = toSelectionArray(filters.linha)
+    const selectedOperations = toSelectionArray(filters.operacao)
+
     return processedData.filter(card => {
       const keywordMatch = !keyword || getSearchText(card).includes(keyword)
-      const selectedProjects = (Array.isArray(filters.projeto) ? filters.projeto : (filters.projeto ? [filters.projeto] : [])).map(normalizeSearch)
-      const selectedLines = (Array.isArray(filters.linha) ? filters.linha : (filters.linha ? [filters.linha] : [])).map(normalizeSearch)
-      const selectedOperations = (Array.isArray(filters.operacao) ? filters.operacao : (filters.operacao ? [filters.operacao] : [])).map(normalizeSearch)
       const projectMatch = selectedProjects.length === 0 || selectedProjects.includes(normalizeSearch(card.projeto))
       const lineMatch = selectedLines.length === 0 || selectedLines.includes(normalizeSearch(card.linha))
       const operationMatch = selectedOperations.length === 0 || selectedOperations.includes(normalizeSearch(card.operacao))
@@ -93,6 +151,7 @@ export default function Visualizacao({
   useEffect(() => { setPage(1) }, [filtered])
 
   const visible = useMemo(() => filtered.slice(0, page * PAGE_SIZE), [filtered, page])
+  const hierarchy = useMemo(() => groupByProjectLineOperation(visible), [visible])
   const hasMore = filtered.length > visible.length
   const remaining = filtered.length - visible.length
 
@@ -150,14 +209,58 @@ export default function Visualizacao({
             </div>
           ) : (
             <>
-              <div className="cards-grid">
-                {visible.map((card, index) => (
-                  <CardTransmissao
-                    key={card.id}
-                    card={card}
-                    onSelect={onSelectCard}
-                    index={index}
-                  />
+              <div className="transmission-hierarchy">
+                {hierarchy.map(project => (
+                  <section className="hierarchy-project" key={project.key}>
+                    <header className="hierarchy-project-header">
+                      <div className="hierarchy-heading-main">
+                        <Folder className="hierarchy-heading-icon" aria-hidden="true" />
+                        <div>
+                          <span className="hierarchy-level-label">PROJETO</span>
+                          <h2>{project.label}</h2>
+                        </div>
+                      </div>
+                      <span className="hierarchy-item-count">
+                        {project.count} {project.count === 1 ? 'transmissão' : 'transmissões'}
+                      </span>
+                    </header>
+
+                    <div className="hierarchy-lines">
+                      {project.lines.map(line => (
+                        <section className="hierarchy-line" key={`${project.key}-${line.key}`}>
+                          <header className="hierarchy-line-header">
+                            <GitBranch className="hierarchy-line-icon" aria-hidden="true" />
+                            <span className="hierarchy-level-label">LINHA</span>
+                            <h3>{line.label}</h3>
+                            <span className="hierarchy-item-count">{line.count} {line.count === 1 ? 'transmissão' : 'transmissões'}</span>
+                          </header>
+
+                          <div className="hierarchy-operations">
+                            {line.operations.map(operation => (
+                              <section className="hierarchy-operation" key={`${project.key}-${line.key}-${operation.key}`}>
+                                <header className="hierarchy-operation-header">
+                                  <span className="hierarchy-operation-chip"><Hash size={13} aria-hidden="true"/> OP</span>
+                                  <h4>{operation.label}</h4>
+                                  <span className="hierarchy-item-count">{operation.cards.length} {operation.cards.length === 1 ? 'transmissão' : 'transmissões'}</span>
+                                </header>
+
+                                <div className="cards-grid hierarchy-cards-grid">
+                                  {operation.cards.map((card, index) => (
+                                    <CardTransmissao
+                                      key={`${card.id}-${index}`}
+                                      card={card}
+                                      onSelect={onSelectCard}
+                                      index={index}
+                                    />
+                                  ))}
+                                </div>
+                              </section>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
 

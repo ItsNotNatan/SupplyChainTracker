@@ -13,8 +13,8 @@
 
 ## Engenharia
 
-- Unificadas as engenharias Mecânica e Controls dentro de uma única caixa **Engenharia**, com duas subdivisões internas: **Mec** e **Controls**.
-- Mecânica: Desenho 3D, Desenho 2D, Lista de materiais mecânicos e Revisão.
+- Unificadas as engenharias Mecânica e Controls dentro de uma única caixa **Engenharia**, com duas subdivisões internas: **Mecânica** e **Controls**.
+- Mecânica: Desenho 3D, Desenho 2D e Lista de materiais mecânicos. O campo Revisão foi removido.
 - Controls: Projeto elétrico, Lista de materiais de controls, Topográfico, Lista de identificações e Layout de calha.
 - Horas estimadas removidas da interface de Engenharia.
 - Estratégia removida de Engenharia e apresentada em Manufatura.
@@ -24,7 +24,7 @@
 - Criadas classes separadas para materiais **Comerciais** e **Construtivos**.
 - Campos apresentados: quantidade, descrição, referência, fabricante (Comerciais) ou fornecedor (Construtivos), status da liberação, Nº da RC e Nº da PO.
 - Cada classe apresenta os marcos Liberação, Inserção de tarefa, Requisição e Pedido com Planeado, Previsto e Realizado.
-- Preparados campos de data simples para Data de entrega na COMAU, Data da criação do P&S e Data de entrega ao usuário; a origem e a associação com outras planilhas ainda precisam ser definidas.
+- Preparados campos Planejado/Previsto/Realizado para Entrega na COMAU, Criação do P&S e Entrega ao usuário; a origem e a associação com outras planilhas ainda precisam ser definidas.
 - Criadas as etiquetas verdes **Antecipação** e **Já antecipado**; ambas classificam o item como Comercial.
 - Removida a geração artificial de números RC/PO quando os dados não existem.
 
@@ -56,9 +56,9 @@
 - Removida a exibição de fornecedor no cartão-resumo; o fornecedor permanece nos dados do item construtivo.
 - Ajustadas as subdivisões da Engenharia para **Mec** e **Controls**.
 - Antecipação e Já antecipado passam a prevalecer sobre a classificação Construtivo e são armazenadas como Comerciais.
-- Os quatro marcos de materiais mantêm a estrutura Planeado/Previsto/Realizado; as três datas complementares usam um único campo de data cada.
+- Os sete marcos de materiais usam a estrutura Planeado/Previsto/Realizado e aparecem na mesma tabela.
 - Testes do processador com a demonstração e planilhas sintéticas: os rótulos Antecipação/Já antecipado foram classificados como Comerciais, um item Construtivo comum permaneceu Construtivo, os cabeçalhos de datas em duas linhas foram lidos e os campos de fornecedor/data complementar foram preservados.
-- Sintaxe dos 14 arquivos `.js`/`.jsx` e resolução dos imports relativos: sem erros.
+- Sintaxe dos arquivos `.js`/`.jsx` e resolução dos imports locais de código: sem erros. As imagens da logo são assets externos e devem continuar presentes no projeto local.
 - **Build Vite não executado:** a instalação das dependências não foi possível em modo offline porque o pacote `@vitejs/plugin-react` não estava disponível no cache npm.
 
 ## Como validar no seu computador
@@ -134,6 +134,48 @@ Na abertura dos detalhes de uma transmissão, foi incluída uma área com duas c
 
 ### Pendências que continuam aguardando definição
 
-- Definição do significado e das regras da cor amarela do semáforo por Felipe.
-- Definição da regra consolidada que determina quando o card de cada material Comercial fica verde ou vermelho a partir dos marcos.
+- Definição do significado e das regras da cor amarela do semáforo por Felipe. Até lá, datas sem classificação segura aparecem em cinza neutro.
+- Validação com Felipe da regra conservadora de consolidação: qualquer marco atrasado deixa o material vermelho; verde exige que todos os marcos que possuem dados estejam concluídos no prazo; casos incompletos ficam neutros.
 - Planilhas reais de origem e chave de relacionamento para as datas complementares, para validar o mapeamento contra dados reais.
+
+
+## Atualização — Semáforos de prazo e correção de estados sem mapeamento
+
+### Semáforos individuais dos marcos
+
+- Incluído um indicador circular ao lado de cada um dos sete marcos na tabela de materiais.
+- **Verde:** há data planejada e data realizada igual ou anterior ao planejado.
+- **Vermelho:** a previsão está depois da data planejada; se já existe realizado, uma realização posterior ao planejado também é apresentada como atraso.
+- **Cinza neutro:** não há dados suficientes para comparar, ou há previsão dentro do planejado aguardando realização.
+- **Amarelo não aplicado:** a reunião registrou que o significado do amarelo ainda seria definido por Felipe. O sistema não atribui significado por conta própria.
+
+### Status consolidado de cada material Comercial
+
+- A borda do card comercial fica vermelha se pelo menos um marco com dados estiver atrasado.
+- A borda fica verde quando todos os marcos que possuem dados estão concluídos no prazo.
+- Fica cinza quando não há dados suficientes ou ainda há marcos sem realização.
+- O indicador circular do card apresenta a mesma situação e uma explicação acessível no tooltip.
+- O status consolidado da caixa Comerciais fica vermelho se algum material estiver atrasado, verde quando todos os materiais estiverem concluídos no prazo e neutro nos demais casos.
+- A cor de antecipação continua identificando a tag “Antecipação”/“Já antecipado”; ela não substitui a avaliação dos prazos.
+
+### Correção de dados não mapeados
+
+- “Não mapeado”, “Não informado” e equivalentes deixam de ser tratados como informação de conclusão.
+- “Pendente” deixou de ser ignorado como se fosse ausência de dados: agora é reconhecido como informação existente e não concluída.
+- A simples existência de um objeto/linha PCP não faz a Manufatura parecer preenchida. O status considera os campos reais de montagem, medição, bordo-máquina e inspeção.
+- O texto de fallback “Registrado no PCP” foi trocado por “Não mapeado” quando não existe um valor específico para Bordo-máquina.
+
+### Validações desta atualização
+
+- Testados os estados: realizado antes do planejado (verde), realizado no dia planejado (verde), previsão depois do planejado (vermelho), previsão dentro do prazo sem realizado (neutro), realizado depois do planejado (vermelho) e ausência de datas (neutro).
+- Testada a consolidação dos status de materiais.
+- Processamento da base de demonstração executado com sucesso (4 transmissões).
+- Testado um registro PCP com campos “Não mapeado”: a Manufatura permanece sem status, em vez de ser marcada automaticamente como em andamento/concluída.
+- Sintaxe JS/JSX validada em 17 arquivos.
+- Build Vite não executado: a pasta `node_modules` não está presente e o ambiente não dispõe das dependências instaladas.
+
+### Pendências que dependem de informação externa
+
+- **Cor amarela:** falta Felipe definir o significado e o critério para acendê-la.
+- **Datas externas:** o modelo já aceita Planejado/Previsto/Realizado para Entrega na COMAU, Criação do P&S e Entrega ao usuário, mas a importação real depende da identificação das planilhas/abas, colunas e chave de relacionamento. A reunião não definiu essas fontes.
+- **Validação da regra consolidada:** a regra implementada é conservadora (qualquer marco atrasado deixa o material vermelho; verde exige que todos os marcos com dados estejam concluídos no prazo). Recomenda-se confirmar essa agregação com Felipe antes de tratá-la como regra definitiva do processo.

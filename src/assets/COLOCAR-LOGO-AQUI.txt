@@ -1,0 +1,6 @@
+Coloque o arquivo original da logo COMAU nesta pasta com o nome:
+logo-comau.png
+
+A landing page importa a imagem por:
+- src/paginas/CentralOperacoes/CentralOperacoes.jsx: ../../assets/logo-comau.png
+- src/componentes/Cabecalho.jsx: ../assets/logo-comau.png

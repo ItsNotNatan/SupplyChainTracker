@@ -1,4 +1,4 @@
-import { Folder, Hash, PenTool, Package, Settings, Factory } from 'lucide-react'
+import { Hash, PenTool, Package, Settings, Factory } from 'lucide-react'
 import { getTheme } from '../utils/formatadores.js'
 
 const STAGES_MAP = [
@@ -26,20 +26,13 @@ export default function CardTransmissao({ card, onSelect, index = 0 }) {
       aria-label={`Abrir transmissão ${card.id}`}
       style={{ animationDelay: `${Math.min(index * 40, 480)}ms` }}
     >
-      <div className="card-header">
-        <div className="transmission-meta" aria-label="Identificação da transmissão">
-          <div className="transmission-meta-row">
-            <span className="card-tag"><Folder className="icon-inline" /> Projeto: {card.projeto || 'Não informado'}</span>
-            <span className="card-tag">Linha: {card.linha || '—'}</span>
-          </div>
-          <div className="transmission-meta-row">
-            <span className="card-tag">Operação: {card.operacao || '—'}</span>
-            <span className="card-tag card-tag-quantity"><Hash className="icon-inline" /> Qtd: {card.qtd || 1}</span>
-          </div>
-        </div>
+      <div className="card-header transmission-card-header">
+        <span className="card-tag card-tag-quantity transmission-card-quantity">
+          <Hash className="icon-inline" /> Qtd: {card.qtd || 1}
+        </span>
       </div>
 
-      {/* O nome da transmissão permanece como título, sem o rótulo ID: e sem caixa ao redor. */}
+      {/* O nome da transmissão permanece em destaque, sem o prefixo ID: e sem caixa ao redor. */}
       <h3 className="card-title transmission-title">{card.id}</h3>
 
       <p className="card-desc"><strong>Descrição:</strong> {card.descricao || 'Não informada'}</p>
