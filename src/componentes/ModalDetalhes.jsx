@@ -77,13 +77,6 @@ export default function ModalDetalhes({ card, onClose }) {
         <div className="modal-body">
           <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={setActiveTab} />
 
-          <MaterialCategorySelector
-            activeTab={activeTab}
-            onSelect={setActiveTab}
-            commercialCount={commercialItems.length}
-            constructiveCount={constructiveItems.length}
-          />
-
           {(showAll || showCommercial || showConstructive) && (
             <MaterialGlobalSearch value={materialSearch} onChange={setMaterialSearch} />
           )}
@@ -164,68 +157,6 @@ export default function ModalDetalhes({ card, onClose }) {
   )
 }
 
-function MaterialCategorySelector({
-  activeTab,
-  onSelect,
-  commercialCount,
-  constructiveCount
-}) {
-  const categories = [
-    {
-      key: 'Comerciais',
-      title: 'Comerciais',
-      description: 'Visualizar somente os materiais comerciais desta transmissão',
-      count: commercialCount,
-      icon: Package,
-      className: 'commercial'
-    },
-    {
-      key: 'Construtivos',
-      title: 'Construtivos',
-      description: 'Visualizar somente os materiais construtivos desta transmissão',
-      count: constructiveCount,
-      icon: Settings,
-      className: 'constructive'
-    }
-  ]
-
-  return (
-    <section className="material-category-area" aria-label="Selecionar classe de materiais">
-      <div className="material-category-heading">
-        <h3>Materiais da transmissão</h3>
-        <p>Selecione uma das caixas para visualizar os itens daquela classe.</p>
-      </div>
-
-      <div className="material-category-selector">
-        {categories.map(({ key, title, description, count, icon: Icon, className }) => (
-          <button
-            key={key}
-            type="button"
-            className={`material-category-button ${className} ${activeTab === key ? 'selected' : ''}`}
-            onClick={() => onSelect(key)}
-            aria-pressed={activeTab === key}
-          >
-            <span className="material-category-icon"><Icon className="icon-lg" /></span>
-            <span className="material-category-copy">
-              <strong>{title}</strong>
-              <small>{description}</small>
-            </span>
-            <span className="material-category-count">
-              <strong>{count}</strong>
-              <small>{count === 1 ? 'item' : 'itens'}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'Comerciais' || activeTab === 'Construtivos' ? (
-        <button type="button" className="material-category-show-all" onClick={() => onSelect('All')}>
-          Mostrar todas as etapas novamente
-        </button>
-      ) : null}
-    </section>
-  )
-}
 
 function SectionTitle({ icon: Icon, title, status }) {
   const theme = getTheme(status)

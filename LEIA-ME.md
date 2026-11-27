@@ -1,10 +1,23 @@
-# Correção do nome da transmissão
+# Correção — remover seletor de categorias dos materiais
 
-Substitua os dois arquivos mantendo estes caminhos:
+## Arquivos
 
-- `src/componentes/CardTransmissao.jsx`
+- `src/componentes/ModalDetalhes.jsx`
 - `src/estilos.css`
 
-O nome/identificador completo da transmissão continua aparecendo como título normal, abaixo das etiquetas Projeto/Linha e Operação/Qtd. Foi removido o enquadramento visual ao redor dele. Não há o prefixo `ID:`.
+## O que foi removido
 
-O restante dos dados e dos cards de etapas foi mantido.
+- O painel com o título “Materiais da transmissão”.
+- O texto “Selecione uma das caixas para visualizar os itens daquela classe”.
+- Os dois cards/seletoras “Comerciais” e “Construtivos”.
+- O botão “Mostrar todas as etapas novamente”.
+- Os estilos CSS exclusivos desse seletor.
+
+## O que foi preservado
+
+- A busca única compartilhada pelos materiais Comerciais e Construtivos.
+- A listagem de ambas as categorias quando o modal está na visão geral.
+- A possibilidade de filtrar uma categoria pelas etapas da árvore superior.
+- Os cards dos materiais, a paginação e o restante do modal.
+
+Substitua os dois arquivos mantendo os caminhos acima.
