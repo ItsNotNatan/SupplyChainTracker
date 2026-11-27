@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Filter, SearchX, ChevronDown, Search, Folder, GitBranch, Hash } from 'lucide-react'
+import { Filter, SearchX, ChevronDown, Search, Folder, GitBranch, Hash, AlertCircle, Calendar, CheckCircle2 } from 'lucide-react'
 import CardTransmissao from '../componentes/CardTransmissao.jsx'
 import FiltroMultiplo from '../componentes/FiltroMultiplo.jsx'
 import ModalDetalhes from '../componentes/ModalDetalhes.jsx'
+import { getTransmissionScheduleStatus } from '../utils/statusCronograma.js'
 
 const PAGE_SIZE = 48
 
@@ -132,8 +133,9 @@ export default function Visualizacao({
   onCloseModal
 }) {
   const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const filtered = useMemo(() => {
+  const filteredByCriteria = useMemo(() => {
     const keyword = normalizeSearch(filters.palavraChave)
     const selectedProjects = toSelectionArray(filters.projeto)
     const selectedLines = toSelectionArray(filters.linha)
@@ -147,6 +149,54 @@ export default function Visualizacao({
       return keywordMatch && projectMatch && lineMatch && operationMatch
     })
   }, [processedData, filters])
+
+  // Classifica cada transmissão uma única vez e utiliza o mesmo resultado
+  // tanto para os indicadores quanto para o filtro acionado pelos cards.
+  const classifiedCards = useMemo(() => filteredByCriteria.map(card => ({
+    card,
+    status: getTransmissionScheduleStatus(card)
+  })), [filteredByCriteria])
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: filteredByCriteria.length,
+      delayed: 0,
+      attention: 0,
+      'late-complete': 0,
+      complete: 0
+    }
+
+    classifiedCards.forEach(({ status }) => {
+      if (Object.prototype.hasOwnProperty.call(counts, status.code)) {
+        counts[status.code] += 1
+      }
+    })
+
+    return counts
+  }, [filteredByCriteria.length, classifiedCards])
+
+  const filtered = useMemo(() => {
+    if (statusFilter === 'all') return filteredByCriteria
+    return classifiedCards
+      .filter(({ status }) => status.code === statusFilter)
+      .map(({ card }) => card)
+  }, [filteredByCriteria, classifiedCards, statusFilter])
+
+  const statusCards = [
+    { key: 'all', label: 'Total', tone: 'total', Icon: Folder, description: 'Todas as transmissões dos filtros atuais' },
+    { key: 'delayed', label: 'Transmissões em atraso', tone: 'delayed', Icon: AlertCircle, description: 'Pelo menos um marco vermelho' },
+    { key: 'attention', label: 'Previsto para próximos 7 dias', tone: 'attention', Icon: Calendar, description: 'Pelo menos um marco amarelo, sem marco vermelho' },
+    { key: 'late-complete', label: 'Concluído em atraso', tone: 'late-complete', Icon: CheckCircle2, description: 'Marcos conhecidos concluídos, com ao menos um realizado após o planejado' },
+    { key: 'complete', label: 'Concluído no prazo', tone: 'complete', Icon: CheckCircle2, description: 'Marcos conhecidos concluídos dentro do prazo' }
+  ]
+
+  const handleStatusFilter = key => {
+    if (key === 'all' || statusFilter === key) {
+      setStatusFilter('all')
+    } else {
+      setStatusFilter(key)
+    }
+  }
 
   useEffect(() => { setPage(1) }, [filtered])
 
@@ -196,8 +246,30 @@ export default function Visualizacao({
           />
         </div>
 
+        <div className="transmission-status-kpis" aria-label="Resumo de transmissões por status">
+          {statusCards.map(({ key, label, tone, Icon, description }) => (
+            <button
+              type="button"
+              key={key}
+              className={`transmission-kpi transmission-kpi--${tone}${statusFilter === key ? ' is-selected' : ''}`}
+              onClick={() => handleStatusFilter(key)}
+              aria-pressed={statusFilter === key}
+              title={`${description}. Clique para filtrar as transmissões.`}
+            >
+              <span className="transmission-kpi-icon" aria-hidden="true">
+                <Icon size={20} strokeWidth={2.1} />
+              </span>
+              <span className="transmission-kpi-copy">
+                <span className="transmission-kpi-label">{label}</span>
+                <strong className="transmission-kpi-value">{statusCounts[key]}</strong>
+              </span>
+            </button>
+          ))}
+        </div>
+
         <div className="cards-result-count">
           {filtered.length} {filtered.length === 1 ? 'transmissão encontrada' : 'transmissões encontradas'}
+          {statusFilter !== 'all' && ' no status selecionado'}
         </div>
 
         <div className="cards-wrapper">

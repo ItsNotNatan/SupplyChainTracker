@@ -199,3 +199,72 @@ export function getMaterialCollectionStatus(items, milestoneKeys = MATERIAL_MILE
 
   return 'Vazio'
 }
+
+
+/**
+ * Consolida os marcos de uma transmissão em um único status para os indicadores
+ * do painel Projeto > Linha > Operação.
+ *
+ * Prioridade para a transmissão:
+ * 1. delayed      -> ao menos um marco vermelho;
+ * 2. attention    -> sem vermelho e ao menos um marco amarelo;
+ * 3. late-complete-> todos os marcos com datas conhecidos concluídos, com atraso;
+ * 4. complete     -> todos os marcos com datas conhecidos concluídos no prazo;
+ * 5. unknown      -> demais situações (exibidas em cinza e contabilizadas apenas em Total).
+ *
+ * Marcos sem qualquer data não entram na consolidação até que sua fonte seja integrada.
+ */
+export function getTransmissionScheduleStatus(transmission, today = new Date()) {
+  const milestoneStatuses = []
+  const addTriple = triple => {
+    if (!triple || typeof triple !== 'object') return
+    const status = getMilestoneScheduleStatus(triple, today)
+    if (status.hasData) milestoneStatuses.push(status)
+  }
+
+  const materials = [
+    ...(transmission?.materiais?.comerciais || []),
+    ...(transmission?.materiais?.construtivos || [])
+  ]
+
+  materials.forEach(material => {
+    Object.values(material?.datas || {}).forEach(addTriple)
+    Object.values(material?.datasComplementares || {}).forEach(addTriple)
+  })
+
+  ;['mecanica', 'controls'].forEach(group => {
+    Object.values(transmission?.engenharia?.[group] || {}).forEach(deliverable => {
+      addTriple(deliverable?.datas)
+    })
+  })
+
+  addTriple(
+    transmission?.manufatura?.entregaDispositivo ||
+    transmission?.pcp?.entregaDispositivo
+  )
+
+  if (milestoneStatuses.length === 0) {
+    return { code: 'unknown', label: 'Sem datas suficientes para classificar a transmissão', hasData: false }
+  }
+
+  if (milestoneStatuses.some(status => status.code === 'delayed')) {
+    return { code: 'delayed', label: 'Transmissão em atraso', hasData: true }
+  }
+
+  if (milestoneStatuses.some(status => status.code === 'attention')) {
+    return { code: 'attention', label: 'Possui marco previsto para os próximos sete dias', hasData: true }
+  }
+
+  const allKnownMilestonesCompleted = milestoneStatuses.every(status => (
+    status.code === 'complete' || status.code === 'late-complete'
+  ))
+
+  if (allKnownMilestonesCompleted) {
+    const hasLateCompletion = milestoneStatuses.some(status => status.code === 'late-complete')
+    return hasLateCompletion
+      ? { code: 'late-complete', label: 'Transmissão concluída com atraso', hasData: true }
+      : { code: 'complete', label: 'Transmissão concluída no prazo', hasData: true }
+  }
+
+  return { code: 'unknown', label: 'Demais condições (cinza)', hasData: true }
+}
