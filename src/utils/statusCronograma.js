@@ -1,14 +1,12 @@
 /**
- * Regras de status do cronograma dos materiais.
+ * Regras oficiais dos semáforos do cronograma, conforme orientação do cliente.
  *
- * Regras já alinhadas na reunião:
- * - Verde: realizado antes ou na data planejada.
- * - Vermelho: previsto depois da data planejada.
- * - Amarelo: ainda não implementado, pois o significado não foi definido.
- *
- * Quando não há dados suficientes para comparar, a interface usa cinza neutro.
- * Isso evita atribuir um significado incorreto à cor amarela ou marcar um item
- * como concluído sem evidência nas datas.
+ * Prioridade (da primeira condição atendida para a última):
+ * 1. Vermelho: Realizado vazio E Previsto > Planejado.
+ * 2. Verde claro: Realizado > Planejado.
+ * 3. Verde escuro: Realizado <= Planejado.
+ * 4. Amarelo: Previsto - 7 dias <= Hoje.
+ * 5. Cinza: todas as demais condições.
  */
 
 export const MATERIAL_MILESTONE_KEYS = [
@@ -21,94 +19,183 @@ export const MATERIAL_MILESTONE_KEYS = [
   'entregaUsuario'
 ]
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const PLACEHOLDERS = new Set(['-', '—', 'n/a', 'na', 'nao mapeado', 'não mapeado', 'nao informado', 'não informado'])
+
+function isBlankDate(value) {
+  if (value === undefined || value === null) return true
+  if (typeof value === 'string') {
+    const text = value.trim()
+    return !text || PLACEHOLDERS.has(text.toLowerCase())
+  }
+  return false
+}
+
 function parseDate(value) {
-  if (value === undefined || value === null || value === '') return null
+  if (isBlankDate(value)) return null
+
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value
   }
 
-  const text = String(value).trim()
-  if (!text) return null
-
-  // Aceita datas brasileiras sem depender do formato regional do navegador.
-  const brDate = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
-  if (brDate) {
-    const [, day, month, year] = brDate
-    const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+  // O Excel pode entregar datas como números seriais.
+  if (typeof value === 'number' || /^\d+(?:\.\d+)?$/.test(String(value).trim())) {
+    const serial = Number(value)
+    if (!Number.isFinite(serial) || serial <= 0 || serial > 100000) return null
+    const parsed = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * DAY_MS))
     return Number.isNaN(parsed.getTime()) ? null : parsed
   }
 
-  const parsed = new Date(value)
+  const text = String(value).trim()
+
+  // Datas brasileiras: DD/MM/AAAA, DD-MM-AAAA ou DD.MM.AAAA.
+  const brDate = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?:\s.*)?$/)
+  if (brDate) {
+    const [, dayText, monthText, yearText] = brDate
+    const day = Number(dayText)
+    const month = Number(monthText)
+    const year = Number(yearText)
+    const parsed = new Date(Date.UTC(year, month - 1, day))
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) return null
+    return parsed
+  }
+
+  // Data ISO sem horário: evita interpretação local do navegador.
+  const isoDate = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (isoDate) {
+    const [, yearText, monthText, dayText] = isoDate
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const day = Number(dayText)
+    const parsed = new Date(Date.UTC(year, month - 1, day))
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) return null
+    return parsed
+  }
+
+  const parsed = new Date(text)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 function dateNumber(value) {
   const date = parseDate(value)
   if (!date) return null
-  // Compara apenas o dia, sem diferenças causadas por horário/timezone.
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
 }
 
-export function getMilestoneScheduleStatus(triple = {}) {
+function todayNumber(value = new Date()) {
+  const date = value instanceof Date ? value : parseDate(value)
+  if (!date || Number.isNaN(date.getTime())) return Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+  // Usa o dia local atual para a regra "Hoje", sem comparar horários.
+  if (value instanceof Date) {
+    return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())
+  }
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
+
+export function getMilestoneScheduleStatus(triple = {}, today = new Date()) {
   const planned = dateNumber(triple.planejado)
   const forecast = dateNumber(triple.previsto)
   const actual = dateNumber(triple.realizado)
   const hasData = planned !== null || forecast !== null || actual !== null
 
-  if (planned === null) {
+  // Vermelho: ainda não realizado e previsão posterior ao planejado.
+  if (actual === null && planned !== null && forecast !== null && forecast > planned) {
     return {
-      code: 'unknown',
-      label: hasData ? 'Sem data planejada para comparação' : 'Sem datas disponíveis',
-      hasData
+      code: 'delayed',
+      label: 'Vermelho: sem realização e previsto posterior ao planejado',
+      hasData: true
     }
   }
 
-  // O realizado é a informação final e prevalece sobre uma previsão anterior.
-  if (actual !== null) {
-    return actual <= planned
-      ? { code: 'complete', label: 'Concluído até a data planejada', hasData: true }
-      : { code: 'delayed', label: 'Realizado após a data planejada', hasData: true }
+  // Verde claro: foi realizado, mas depois da data planejada.
+  if (actual !== null && planned !== null && actual > planned) {
+    return {
+      code: 'late-complete',
+      label: 'Verde claro: realizado depois do planejado',
+      hasData: true
+    }
   }
 
-  if (forecast !== null && forecast > planned) {
-    return { code: 'delayed', label: 'Previsão posterior à data planejada', hasData: true }
+  // Verde escuro: foi realizado na data planejada ou antes dela.
+  if (actual !== null && planned !== null && actual <= planned) {
+    return {
+      code: 'complete',
+      label: 'Verde escuro: realizado na data planejada ou antes',
+      hasData: true
+    }
   }
 
-  if (forecast !== null) {
-    return { code: 'unknown', label: 'Previsão dentro do planejado; aguardando realização', hasData: true }
+  // Amarelo: a data prevista está dentro dos próximos sete dias
+  // ou já passou. A condição é aplicada depois das três regras anteriores.
+  const todayDay = todayNumber(today)
+  if (forecast !== null && forecast - (7 * DAY_MS) <= todayDay) {
+    return {
+      code: 'attention',
+      label: 'Amarelo: previsto menos sete dias é menor ou igual a hoje',
+      hasData: true
+    }
   }
 
-  return { code: 'unknown', label: 'Aguardando previsão ou realização', hasData: true }
+  return {
+    code: 'unknown',
+    label: hasData ? 'Cinza: demais condições' : 'Cinza: sem datas disponíveis',
+    hasData
+  }
 }
 
-export function getMaterialScheduleStatus(material, milestoneKeys = MATERIAL_MILESTONE_KEYS) {
+export function getMaterialScheduleStatus(material, milestoneKeys = MATERIAL_MILESTONE_KEYS, today = new Date()) {
   const dates = {
     ...(material?.datas || {}),
     ...(material?.datasComplementares || {})
   }
-  const statuses = milestoneKeys.map(key => getMilestoneScheduleStatus(dates[key]))
+  const statuses = milestoneKeys.map(key => getMilestoneScheduleStatus(dates[key], today))
   const milestonesWithData = statuses.filter(status => status.hasData)
 
   if (milestonesWithData.some(status => status.code === 'delayed')) {
-    return { code: 'delayed', label: 'Ponto de atenção: existe marco atrasado' }
+    return { code: 'delayed', label: 'Ponto de atenção: existe marco vermelho' }
   }
 
-  // Só sinaliza verde quando todos os marcos que possuem dados estão concluídos
-  // dentro do prazo. Marcos totalmente sem dados não são tratados como concluídos.
-  if (milestonesWithData.length > 0 && milestonesWithData.every(status => status.code === 'complete')) {
-    return { code: 'complete', label: 'Marcos informados concluídos no prazo' }
+  if (milestonesWithData.some(status => status.code === 'attention')) {
+    return { code: 'attention', label: 'Atenção: existe marco previsto para até sete dias' }
+  }
+
+  // A cor geral só fica verde quando todos os marcos que possuem dados
+  // foram realizados. Marcos sem qualquer informação continuam fora da conta,
+  // preservando a regra anterior enquanto as fontes externas são integradas.
+  const allKnownMilestonesCompleted = milestonesWithData.length > 0 && milestonesWithData.every(
+    status => status.code === 'complete' || status.code === 'late-complete'
+  )
+
+  if (allKnownMilestonesCompleted) {
+    const hasLateCompletion = milestonesWithData.some(status => status.code === 'late-complete')
+    return hasLateCompletion
+      ? { code: 'late-complete', label: 'Materiais informados concluídos, com marco realizado após o planejado' }
+      : { code: 'complete', label: 'Materiais informados concluídos no prazo' }
   }
 
   return { code: 'unknown', label: 'Status ainda não determinado pelas datas disponíveis' }
 }
 
-export function getMaterialCollectionStatus(items, milestoneKeys = MATERIAL_MILESTONE_KEYS) {
+export function getMaterialCollectionStatus(items, milestoneKeys = MATERIAL_MILESTONE_KEYS, today = new Date()) {
   if (!Array.isArray(items) || items.length === 0) return 'Vazio'
 
-  const statuses = items.map(item => getMaterialScheduleStatus(item, milestoneKeys))
+  const statuses = items.map(item => getMaterialScheduleStatus(item, milestoneKeys, today))
   if (statuses.some(status => status.code === 'delayed')) return 'On delayed'
-  if (statuses.every(status => status.code === 'complete')) return 'Complete'
+  if (statuses.some(status => status.code === 'attention')) return 'Ongoing'
 
-  // Não usamos Ongoing porque o indicador amarelo ainda aguarda definição.
+  if (statuses.every(status => status.code === 'complete' || status.code === 'late-complete')) {
+    return statuses.some(status => status.code === 'late-complete') ? 'Complete late' : 'Complete'
+  }
+
   return 'Vazio'
 }

@@ -11,8 +11,8 @@ const PERIOD_ALIASES = {
 }
 
 const MILESTONES = [
-  { key: 'liberacao', label: 'Liberação', aliases: ['liberacao', 'release'] },
-  { key: 'insercaoTarefa', label: 'Inserção de tarefa', aliases: ['insercao de tarefa', 'insercao da tarefa', 'insercao tarefa', 'task insertion'] },
+  { key: 'liberacao', label: 'Liberação de eng.', aliases: ['liberacao de eng', 'liberacao engenharia', 'liberacao', 'engineering release', 'release'] },
+  { key: 'insercaoTarefa', label: 'Aprovação do PM', aliases: ['aprovacao do pm', 'aprovacao pm', 'insercao de tarefa', 'insercao da tarefa', 'insercao tarefa', 'task insertion', 'pm approval'] },
   { key: 'requisicao', label: 'Requisição', aliases: ['requisicao', 'requisition'] },
   { key: 'pedido', label: 'Pedido', aliases: ['pedido', 'purchase order', 'ordem de compra'] }
 ]

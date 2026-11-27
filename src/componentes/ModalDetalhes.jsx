@@ -8,8 +8,8 @@ import ArvoreHierarquia from './ArvoreHierarquia.jsx'
 import { getMaterialScheduleStatus, getMilestoneScheduleStatus } from '../utils/statusCronograma.js'
 
 const MATERIAL_MILESTONES = [
-  { key: 'liberacao', label: 'Liberação' },
-  { key: 'insercaoTarefa', label: 'Inserção de tarefa' },
+  { key: 'liberacao', label: 'Liberação de eng.' },
+  { key: 'insercaoTarefa', label: 'Aprovação do PM' },
   { key: 'requisicao', label: 'Requisição' },
   { key: 'pedido', label: 'Pedido' },
   { key: 'entregaComau', label: 'Entrega na COMAU' },
@@ -76,6 +76,7 @@ export default function ModalDetalhes({ card, onClose }) {
 
         <div className="modal-body">
           <ArvoreHierarquia stages={card.stages} activeTab={activeTab} onTabChange={setActiveTab} />
+          <StatusLegend />
 
           {(showAll || showCommercial || showConstructive) && (
             <MaterialGlobalSearch value={materialSearch} onChange={setMaterialSearch} />
@@ -183,6 +184,30 @@ function EngineeringSubsection({ title, status, children }) {
       </div>
       {children}
     </div>
+  )
+}
+
+function StatusLegend() {
+  const items = [
+    { code: 'delayed', label: 'Vermelho', description: 'Realizado vazio e Previsto > Planejado' },
+    { code: 'late-complete', label: 'Verde claro', description: 'Realizado > Planejado' },
+    { code: 'complete', label: 'Verde escuro', description: 'Realizado <= Planejado' },
+    { code: 'attention', label: 'Amarelo', description: 'Previsto - 7 dias <= Hoje' },
+    { code: 'unknown', label: 'Cinza', description: 'Demais condições' }
+  ]
+
+  return (
+    <aside className="schedule-status-legend" aria-label="Legenda dos semáforos">
+      <strong className="schedule-status-legend-title">Legenda</strong>
+      <div className="schedule-status-legend-items">
+        {items.map(item => (
+          <span className="schedule-status-legend-item" key={item.code} title={item.description}>
+            <span className={`schedule-status-legend-dot ${item.code}`} aria-hidden="true" />
+            <span><strong>{item.label}:</strong> {item.description}</span>
+          </span>
+        ))}
+      </div>
+    </aside>
   )
 }
 
@@ -328,20 +353,18 @@ function MaterialCard({ item, category }) {
   const overallStatus = getMaterialScheduleStatus(item, MATERIAL_MILESTONES.map(milestone => milestone.key))
 
   return (
-    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'} ${isCommercial ? `material-schedule-${overallStatus.code}` : ''}`}>
+    <article className={`material-card ${isCommercial ? 'material-commercial' : 'material-constructive'} material-schedule-${overallStatus.code}`}>
       <div className="material-card-heading">
         <div>
           <div className="material-type-label">{isCommercial ? 'Material comercial' : 'Material construtivo'}</div>
           <h4 className="material-description">{item.descricao || 'Descrição não informada'}</h4>
         </div>
         <div className="material-card-heading-status">
-          {isCommercial && (
-            <span
-              className={`material-overall-status-dot ${overallStatus.code}`}
-              title={overallStatus.label}
-              aria-label={overallStatus.label}
-            />
-          )}
+          <span
+            className={`material-overall-status-dot ${overallStatus.code}`}
+            title={overallStatus.label}
+            aria-label={overallStatus.label}
+          />
           {item.tag && <span className="anticipation-tag">{item.tag}</span>}
         </div>
       </div>

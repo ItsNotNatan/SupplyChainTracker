@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, Clock, Minus } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Circle, Minus } from 'lucide-react'
 
 export function excelToJSDate(value) {
   if (value === undefined || value === null || value === '') return null
@@ -40,11 +40,13 @@ export function cleanTr(value) {
 export function getTheme(status) {
   switch (status) {
     case 'Complete':
-      return { b: 'border-complete', bg: 'bg-complete', Icon: CheckCircle2, t: 'Concluído', c: 'complete' }
+      return { b: 'border-complete', bg: 'bg-complete', Icon: CheckCircle2, t: 'Concluído no prazo', c: 'complete' }
+    case 'Complete late':
+      return { b: 'border-complete-late', bg: 'bg-complete-late', Icon: CheckCircle2, t: 'Concluído após o prazo', c: 'complete-late' }
     case 'On delayed':
       return { b: 'border-delayed', bg: 'bg-delayed', Icon: AlertCircle, t: 'Atraso/Risco', c: 'delayed' }
     case 'Ongoing':
-      return { b: 'border-ongoing', bg: 'bg-ongoing', Icon: Clock, t: 'Em andamento', c: 'ongoing' }
+      return { b: 'border-ongoing', bg: 'bg-ongoing', Icon: Circle, t: 'Em andamento', c: 'ongoing' }
     default:
       return { b: '', bg: '', Icon: Minus, t: 'Sem informação', c: 'empty' }
   }
